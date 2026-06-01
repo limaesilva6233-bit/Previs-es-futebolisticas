@@ -4,12 +4,161 @@ import streamlit as st
 
 # Configuração da página Web do seu App
 st.set_page_config(
-    page_title="Preditor Avançado - Copa 2026", page_icon="⚽", layout="centered"
+    page_title="Dashboard Preditivo - Futebol 2026",
+    page_icon="⚽",
+    layout="centered",
 )
 
+# Constantes baseadas nas médias históricas de gols por partida
+MEDIA_GOLS_BRASILEIRAO = 1.25  # Média de gols por time em um jogo do Brasileirão
+MEDIA_GOLS_FIFA = 1.35  # Média de gols por time em um jogo de Copa
+
 # ==============================================================================
-# 1. BANCO DE DADOS - AS 48 SELEÇÕES DA COPA 2026
+# 1. BANCO DE DADOS: 20 TIMES DO BRASILEIRÃO & 48 SELEÇÕES DA COPA
 # ==============================================================================
+DADOS_BRASILEIRAO = {
+    "Palmeiras": {
+        "ataque": 2.1,
+        "defesa": 0.8,
+        "escanteios": 6.4,
+        "chutes": 5.8,
+        "cartoes": 2.1,
+    },
+    "Flamengo": {
+        "ataque": 2.3,
+        "defesa": 0.9,
+        "escanteios": 5.9,
+        "chutes": 6.2,
+        "cartoes": 2.4,
+    },
+    "Atlético-MG": {
+        "ataque": 1.8,
+        "defesa": 1.0,
+        "escanteios": 5.5,
+        "chutes": 4.9,
+        "cartoes": 2.8,
+    },
+    "São Paulo": {
+        "ataque": 1.7,
+        "defesa": 0.9,
+        "escanteios": 5.2,
+        "chutes": 4.5,
+        "cartoes": 2.6,
+    },
+    "Botafogo": {
+        "ataque": 2.0,
+        "defesa": 1.0,
+        "escanteios": 5.8,
+        "chutes": 5.5,
+        "cartoes": 2.3,
+    },
+    "Grêmio": {
+        "ataque": 1.6,
+        "defesa": 1.2,
+        "escanteios": 5.0,
+        "chutes": 4.6,
+        "cartoes": 2.7,
+    },
+    "Fluminense": {
+        "ataque": 1.5,
+        "defesa": 1.1,
+        "escanteios": 4.8,
+        "chutes": 4.3,
+        "cartoes": 2.5,
+    },
+    "Athletico-PR": {
+        "ataque": 1.6,
+        "defesa": 1.0,
+        "escanteios": 5.6,
+        "chutes": 4.8,
+        "cartoes": 2.4,
+    },
+    "Internacional": {
+        "ataque": 1.7,
+        "defesa": 0.9,
+        "escanteios": 5.3,
+        "chutes": 4.7,
+        "cartoes": 2.6,
+    },
+    "Fortaleza": {
+        "ataque": 1.5,
+        "defesa": 1.1,
+        "escanteios": 5.1,
+        "chutes": 4.4,
+        "cartoes": 2.2,
+    },
+    "Corinthians": {
+        "ataque": 1.4,
+        "defesa": 1.2,
+        "escanteios": 5.0,
+        "chutes": 4.2,
+        "cartoes": 2.5,
+    },
+    "Cruzeiro": {
+        "ataque": 1.3,
+        "defesa": 1.1,
+        "escanteios": 4.9,
+        "chutes": 4.1,
+        "cartoes": 2.4,
+    },
+    "Vasco": {
+        "ataque": 1.4,
+        "defesa": 1.4,
+        "escanteios": 4.8,
+        "chutes": 4.3,
+        "cartoes": 2.8,
+    },
+    "Bahia": {
+        "ataque": 1.5,
+        "defesa": 1.3,
+        "escanteios": 5.2,
+        "chutes": 4.6,
+        "cartoes": 2.1,
+    },
+    "Santos": {
+        "ataque": 1.4,
+        "defesa": 1.1,
+        "escanteios": 5.0,
+        "chutes": 4.4,
+        "cartoes": 2.3,
+    },
+    "Bragantino": {
+        "ataque": 1.5,
+        "defesa": 1.2,
+        "escanteios": 5.5,
+        "chutes": 4.9,
+        "cartoes": 2.5,
+    },
+    "Cuiabá": {
+        "ataque": 1.1,
+        "defesa": 1.2,
+        "escanteios": 4.2,
+        "chutes": 3.7,
+        "cartoes": 2.6,
+    },
+    "Vitória": {
+        "ataque": 1.2,
+        "defesa": 1.5,
+        "escanteios": 4.5,
+        "chutes": 3.9,
+        "cartoes": 2.7,
+    },
+    "Juventude": {
+        "ataque": 1.1,
+        "defesa": 1.4,
+        "escanteios": 4.3,
+        "chutes": 3.6,
+        "cartoes": 2.9,
+    },
+    "Criciúma": {
+        "ataque": 1.2,
+        "defesa": 1.6,
+        "escanteios": 4.4,
+        "chutes": 3.8,
+        "cartoes": 2.6,
+    },
+}
+
 DADOS_COPA = {
     # GRUPO A
     "México": {
@@ -409,11 +558,8 @@ DADOS_COPA = {
     },
 }
 
-# Constante baseada na média histórica de gols da FIFA por jogo
-MEDIA_GOLS_FIFA = 1.35
-
 # ==============================================================================
-# 2. MOTOR MATEMÁTICO AJUSTADO (Cálculo Proporcional)
+# 2. MOTOR ESTATÍSTICO DE POISSON (FORÇA RELATIVA MULTIPLICATIVA)
 # ==============================================================================
 
 
@@ -421,19 +567,19 @@ def calcular_poisson(lambda_gols, k):
     return (math.exp(-lambda_gols) * (lambda_gols**k)) / math.factorial(k)
 
 
-def processar_confronto(time_a, time_b):
-    t_a = DADOS_COPA[time_a]
-    t_b = DADOS_COPA[time_b]
+def renderizar_analise_confronto(time_a, time_b, dados_origem, media_gols_base):
+    t_a = dados_origem[time_a]
+    t_b = dados_origem[time_b]
 
-    # NOVO MODELO: Força Relativa Avançada (Ataque potencializado pela fraqueza da defesa adversária)
-    lambda_a = t_a["ataque"] * (t_b["defesa"] / MEDIA_GOLS_FIFA)
-    lambda_b = t_b["ataque"] * (t_a["defesa"] / MEDIA_GOLS_FIFA)
+    # Modelo Multiplicativo Avançado para forçar placares realistas e evitar o efeito 1x1 em disparidades
+    lambda_a = t_a["ataque"] * (t_b["defesa"] / media_gols_base)
+    lambda_b = t_b["ataque"] * (t_a["defesa"] / media_gols_base)
 
     prob_a, prob_b, prob_empate = 0, 0, 0
     maior_prob_placar = 0
     placar_mais_provavel = (0, 0)
 
-    # Varre a matriz de gols possíveis de 0 até 7 para capturar goleadas longas
+    # Varredura matricial expandida de gols (0 a 7 gols por equipe)
     for g_a, g_b in itertools.product(range(8), range(8)):
         p_a = calcular_poisson(lambda_a, g_a)
         p_b = calcular_poisson(lambda_b, g_b)
@@ -450,91 +596,108 @@ def processar_confronto(time_a, time_b):
             maior_prob_placar = p_combinada
             placar_mais_provavel = (g_a, g_b)
 
-    # Cálculo dinâmico para os Scouts baseados no ritmo ofensivo gerado pelos Lambdas
+    # Ajuste dinâmico do volume de Scouts (ritmo ofensivo da partida)
     fator_ritmo = (lambda_a + lambda_b) / (t_a["ataque"] + t_b["ataque"])
     escanteios_proj = (t_a["escanteios"] + t_b["escanteios"]) * fator_ritmo
     chutes_proj = (t_a["chutes"] + t_b["chutes"]) * fator_ritmo
+    cartoes_proj = t_a["cartoes"] + t_b["cartoes"]
 
-    return {
-        "vitoria_a": prob_a,
-        "empate": prob_empate,
-        "vitoria_b": prob_b,
-        "placar": f"{placar_mais_provavel[0]} x {placar_mais_provavel[1]}",
-        "confianca_placar": round(maior_prob_placar * 100, 1),
-        "escanteios": round(escanteios_proj, 1),
-        "chutes": round(chutes_proj, 1),
-        "cartoes": round(t_a["cartoes"] + t_b["cartoes"], 1),
-    }
-
-
-# ==============================================================================
-# 3. INTERFACE VISUAL (STREAMLIT WEB)
-# ==============================================================================
-st.title("🏆 Motor de Análise Preditiva - Copa 2026")
-st.markdown(
-    "Algoritmo estatístico baseado em força cruzada multiplicativa e distribuição de Poisson."
-)
-st.markdown("---")
-
-lista_selecoes = sorted(list(DADOS_COPA.keys()))
-
-# Dropdowns de Seleção de Confronto
-col1, col2 = st.columns(2)
-with col1:
-    selecao_a = st.selectbox(
-        "Seleção A (Mandante)",
-        lista_selecoes,
-        index=lista_selecoes.index("Brasil"),
-    )
-with col2:
-    selecao_b = st.selectbox(
-        "Seleção B (Visitante)",
-        lista_selecoes,
-        index=lista_selecoes.index("Haiti"),
-    )
-
-if selecao_a == selecao_b:
-    st.error("Por favor, selecione duas equipes diferentes para o confronto.")
-else:
-    # Processamento Técnico
-    res = processar_confronto(selecao_a, selecao_b)
-
-    # Bloco do Placar Mais Provável
-    st.markdown("### 🎯 Placar Mais Provável Calculado")
-    st.success(f"### **{selecao_a} {res['placar']} {selecao_b}**")
+    # --- INTERFACE DE EXIBIÇÃO COM STREAMLIT ---
+    st.markdown("### 🎯 Placar Mais Provável")
+    st.success(f"### **{time_a} {placar_mais_provavel[0]} x {placar_mais_provavel[1]} {time_b}**")
     st.caption(
-        f"A combinação exata deste placar detém **{res['confianca_placar']}%** de probabilidade isolada dentro da curva de dispersão."
+        f"A assertividade matemática deste placar exato é estimada em **{round(maior_prob_placar * 100, 1)}%**."
     )
-
     st.markdown("---")
 
-    # Gráfico de Barras de Probabilidade (Mercado 1X2)
-    st.markdown("### 📊 Probabilidades de Resultado Geral")
+    st.markdown("### 📊 Probabilidades Probabilísticas (1X2)")
+    col_pct1, col_pct2, col_pct3 = st.columns(3)
+    col_pct1.metric(f"Vitória {time_a}", f"{round(prob_a * 100, 1)}%")
+    col_pct2.metric("Empate", f"{round(prob_empate * 100, 1)}%")
+    col_pct3.metric(f"Vitória {time_b}", f"{round(prob_b * 100, 1)}%")
 
-    pct_a = round(res["vitoria_a"] * 100, 1)
-    pct_empate = round(res["empate"] * 100, 1)
-    pct_b = round(res["vitoria_b"] * 100, 1)
-
-    st.write(f"**Vitória {selecao_a}:** {pct_a}%")
-    st.progress(int(res["vitoria_a"] * 100))
-
-    st.write(f"**Empate:** {pct_empate}%")
-    st.progress(int(res["empate"] * 100))
-
-    st.write(f"**Vitória {selecao_b}:** {pct_b}%")
-    st.progress(int(res["vitoria_b"] * 100))
+    st.progress(int(prob_a * 100))
 
     st.markdown("---")
-
-    # Métricas de Linhas de Scouts para Apostas/Análise (Over/Under)
-    st.markdown("### 📈 Projeção de Scouts Técnicos da Partida")
-
-    dados_scouts = {
-        "Métrica do Scout": [
-            "Escanteios Totais Projetados",
-            "Chutes ao Gol Projetados",
-            "Cartões Amarelos Projetados",
+    st.markdown("### 📈 Linhas Médias de Scouts Projetadas")
+    tabela_scouts = {
+        "Scout Técnico": [
+            "Escanteios Totais",
+            "Chutes a Gol Totais",
+            "Cartões Amarelos Totais",
         ],
-        "Linha Esperada (Média)": [res["escanteios"], res["chutes"], res["cartoes"]],
+        "Linha Esperada": [
+            round(escanteios_proj, 1),
+            round(chutes_proj, 1),
+            round(cartoes_proj, 1),
+        ],
     }
-    st.table(dados_scouts)
+    st.table(tabela_scouts)
+
+
+# ==============================================================================
+# 3. INTERFACE DE NAVEGAÇÃO PRINCIPAL (ABAS MULTI-COMPETIÇÃO)
+# ==============================================================================
+st.title("⚽ Centro Avançado de Estatísticas de Futebol")
+st.markdown("Selecione a competição desejada na aba abaixo para iniciar os cruzamentos técnicos.")
+
+# Criação das Abas Nativas do App
+tab_brasileirao, tab_copa = st.tabs(
+    ["🏆 Campeonato Brasileiro", "🌎 Copa do Mundo 2026"]
+)
+
+# --- CONFIGURAÇÃO DA ABA BRASILEIRÃO ---
+with tab_brasileirao:
+    st.header("Série A - Campeonato Brasileiro")
+    lista_br = sorted(list(DADOS_BRASILEIRAO.keys()))
+
+    col_br1, col_br2 = st.columns(2)
+    with col_br1:
+        br_mandante = st.selectbox(
+            "Selecione o Mandante ",
+            lista_br,
+            index=lista_br.index("Palmeiras"),
+        )
+    with col_br2:
+        br_visitante = st.selectbox(
+            "Selecione o Visitante ",
+            lista_br,
+            index=lista_br.index("Flamengo"),
+        )
+
+    if br_mandante == br_visitante:
+        st.error(
+            "Selecione equipes distintas para obter uma análise de confronto válida."
+        )
+    else:
+        renderizar_analise_confronto(
+            br_mandante, br_visitante, DADOS_BRASILEIRAO, MEDIA_GOLS_BRASILEIRAO
+        )
+
+# --- CONFIGURAÇÃO DA ABA COPA ---
+with tab_copa:
+    st.header("Copa do Mundo FIFA 2026")
+    lista_copa = sorted(list(DADOS_COPA.keys()))
+
+    col_cp1, col_cp2 = st.columns(2)
+    with col_cp1:
+        cp_mandante = st.selectbox(
+            "Selecione a Seleção A",
+            lista_copa,
+            index=lista_copa.index("Brasil"),
+        )
+    with col_cp2:
+        cp_visitante = st.selectbox(
+            "Selecione a Seleção B",
+            lista_copa,
+            index=lista_copa.index("Haiti"),
+        )
+
+    if cp_mandante == cp_visitante:
+        st.error(
+            "Selecione seleções distintas para obter uma análise de confronto válida."
+        )
+    else:
+        renderizar_analise_confronto(
+            cp_mandante, cp_visitante, DADOS_COPA, MEDIA_GOLS_FIFA
+        )
