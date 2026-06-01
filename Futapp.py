@@ -2,13 +2,13 @@ import itertools
 import math
 import streamlit as st
 
-# Configuração da página Web
+# Configuração da página Web do seu App
 st.set_page_config(
-    page_title="Preditor Copa 2026", page_icon="⚽", layout="centered"
+    page_title="Preditor Avançado - Copa 2026", page_icon="⚽", layout="centered"
 )
 
 # ==============================================================================
-# DATA - AS 48 SELEÇÕES DA COPA 2026
+# 1. BANCO DE DADOS - AS 48 SELEÇÕES DA COPA 2026
 # ==============================================================================
 DADOS_COPA = {
     # GRUPO A
@@ -80,8 +80,8 @@ DADOS_COPA = {
     # GRUPO C
     "Brasil": {
         "grupo": "C",
-        "ataque": 2.4,
-        "defesa": 0.7,
+        "ataque": 2.6,
+        "defesa": 0.6,
         "escanteios": 6.8,
         "chutes": 6.5,
         "cartoes": 1.6,
@@ -96,8 +96,8 @@ DADOS_COPA = {
     },
     "Haiti": {
         "grupo": "C",
-        "ataque": 0.9,
-        "defesa": 2.1,
+        "ataque": 0.8,
+        "defesa": 2.4,
         "escanteios": 3.5,
         "chutes": 3.1,
         "cartoes": 2.4,
@@ -154,8 +154,8 @@ DADOS_COPA = {
     },
     "Curaçao": {
         "grupo": "E",
-        "ataque": 0.8,
-        "defesa": 2.3,
+        "ataque": 0.7,
+        "defesa": 2.5,
         "escanteios": 3.4,
         "chutes": 3.0,
         "cartoes": 2.3,
@@ -409,8 +409,11 @@ DADOS_COPA = {
     },
 }
 
+# Constante baseada na média histórica de gols da FIFA por jogo
+MEDIA_GOLS_FIFA = 1.35
+
 # ==============================================================================
-# MOTOR MATEMÁTICO (POISSON)
+# 2. MOTOR MATEMÁTICO AJUSTADO (Cálculo Proporcional)
 # ==============================================================================
 
 
@@ -422,14 +425,16 @@ def processar_confronto(time_a, time_b):
     t_a = DADOS_COPA[time_a]
     t_b = DADOS_COPA[time_b]
 
-    lambda_a = (t_a["ataque"] + t_b["defesa"]) / 2
-    lambda_b = (t_b["ataque"] + t_a["defesa"]) / 2
+    # NOVO MODELO: Força Relativa Avançada (Ataque potencializado pela fraqueza da defesa adversária)
+    lambda_a = t_a["ataque"] * (t_b["defesa"] / MEDIA_GOLS_FIFA)
+    lambda_b = t_b["ataque"] * (t_a["defesa"] / MEDIA_GOLS_FIFA)
 
     prob_a, prob_b, prob_empate = 0, 0, 0
     maior_prob_placar = 0
     placar_mais_provavel = (0, 0)
 
-    for g_a, g_b in itertools.product(range(7), range(7)):
+    # Varre a matriz de gols possíveis de 0 até 7 para capturar goleadas longas
+    for g_a, g_b in itertools.product(range(8), range(8)):
         p_a = calcular_poisson(lambda_a, g_a)
         p_b = calcular_poisson(lambda_b, g_b)
         p_combinada = p_a * p_b
@@ -445,77 +450,91 @@ def processar_confronto(time_a, time_b):
             maior_prob_placar = p_combinada
             placar_mais_provavel = (g_a, g_b)
 
+    # Cálculo dinâmico para os Scouts baseados no ritmo ofensivo gerado pelos Lambdas
+    fator_ritmo = (lambda_a + lambda_b) / (t_a["ataque"] + t_b["ataque"])
+    escanteios_proj = (t_a["escanteios"] + t_b["escanteios"]) * fator_ritmo
+    chutes_proj = (t_a["chutes"] + t_b["chutes"]) * fator_ritmo
+
     return {
         "vitoria_a": prob_a,
         "empate": prob_empate,
         "vitoria_b": prob_b,
         "placar": f"{placar_mais_provavel[0]} x {placar_mais_provavel[1]}",
         "confianca_placar": round(maior_prob_placar * 100, 1),
-        "escanteios": round(t_a["escanteios"] + t_b["escanteios"], 1),
-        "chutes": round(t_a["chutes"] + t_b["chutes"], 1),
+        "escanteios": round(escanteios_proj, 1),
+        "chutes": round(chutes_proj, 1),
         "cartoes": round(t_a["cartoes"] + t_b["cartoes"], 1),
     }
 
 
 # ==============================================================================
-# FRONT-END STREAMLIT
+# 3. INTERFACE VISUAL (STREAMLIT WEB)
 # ==============================================================================
 st.title("🏆 Motor de Análise Preditiva - Copa 2026")
+st.markdown(
+    "Algoritmo estatístico baseado em força cruzada multiplicativa e distribuição de Poisson."
+)
 st.markdown("---")
 
 lista_selecoes = sorted(list(DADOS_COPA.keys()))
 
-# Interface de Seleção dos Times
+# Dropdowns de Seleção de Confronto
 col1, col2 = st.columns(2)
 with col1:
     selecao_a = st.selectbox(
-        "Seleção A (Mandante)", lista_selecoes, index=lista_selecoes.index("Brasil")
+        "Seleção A (Mandante)",
+        lista_selecoes,
+        index=lista_selecoes.index("Brasil"),
     )
 with col2:
     selecao_b = st.selectbox(
         "Seleção B (Visitante)",
         lista_selecoes,
-        index=lista_selecoes.index("Marrocos"),
+        index=lista_selecoes.index("Haiti"),
     )
 
 if selecao_a == selecao_b:
     st.error("Por favor, selecione duas equipes diferentes para o confronto.")
 else:
-    # Processa os dados matemáticas
+    # Processamento Técnico
     res = processar_confronto(selecao_a, selecao_b)
 
-    # Box de Destaque para o Placar Mais Provável
-    st.markdown("### 🎯 Placar Mais Provável")
-    st.info(f"### **{selecao_a} {res['placar']} {selecao_b}**")
+    # Bloco do Placar Mais Provável
+    st.markdown("### 🎯 Placar Mais Provável Calculado")
+    st.success(f"### **{selecao_a} {res['placar']} {selecao_b}**")
     st.caption(
-        f"Este placar exato tem **{res['confianca_placar']}%** de chance matemática de acontecer."
+        f"A combinação exata deste placar detém **{res['confianca_placar']}%** de probabilidade isolada dentro da curva de dispersão."
     )
 
     st.markdown("---")
 
-    # Barras de Probabilidade (Mercado 1X2)
-    st.markdown("### 📊 Probabilidades de Vitória")
+    # Gráfico de Barras de Probabilidade (Mercado 1X2)
+    st.markdown("### 📊 Probabilidades de Resultado Geral")
 
-    st.write(f"**Vitória {selecao_a}:** {round(res['vitoria_a']*100, 1)}%")
+    pct_a = round(res["vitoria_a"] * 100, 1)
+    pct_empate = round(res["empate"] * 100, 1)
+    pct_b = round(res["vitoria_b"] * 100, 1)
+
+    st.write(f"**Vitória {selecao_a}:** {pct_a}%")
     st.progress(int(res["vitoria_a"] * 100))
 
-    st.write(f"**Empate:** {round(res['empate']*100, 1)}%")
+    st.write(f"**Empate:** {pct_empate}%")
     st.progress(int(res["empate"] * 100))
 
-    st.write(f"**Vitória {selecao_b}:** {round(res['vitoria_b']*100, 1)}%")
+    st.write(f"**Vitória {selecao_b}:** {pct_b}%")
     st.progress(int(res["vitoria_b"] * 100))
 
     st.markdown("---")
 
-    # Tabela com as Projeções de Scouts (Over/Under)
-    st.markdown("### 📈 Projeção Estatística de Scouts (Média Combinada)")
+    # Métricas de Linhas de Scouts para Apostas/Análise (Over/Under)
+    st.markdown("### 📈 Projeção de Scouts Técnicos da Partida")
 
     dados_scouts = {
-        "Scout Analisado": [
-            "Escanteios Totais Esperados",
-            "Chutes a Gol Totais Esperados",
-            "Cartões Amarelos Esperados",
+        "Métrica do Scout": [
+            "Escanteios Totais Projetados",
+            "Chutes ao Gol Projetados",
+            "Cartões Amarelos Projetados",
         ],
-        "Linha Projetada": [res["escanteios"], res["chutes"], res["cartoes"]],
+        "Linha Esperada (Média)": [res["escanteios"], res["chutes"], res["cartoes"]],
     }
     st.table(dados_scouts)
