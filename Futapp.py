@@ -46,7 +46,6 @@ DADOS_BRASILEIRAO = {
 
 # ==============================================================================
 # 2. BANCO DE DADOS COMPLETO: AS 48 SELEÇÕES DA COPA DO MUNDO 2026
-# Pesos: 30% Histórico Geral / 70% Campanha nas Eliminatórias e Atuação Recente
 # ==============================================================================
 DADOS_COPA_PONDERADO = {
     # GRUPO A
@@ -91,7 +90,7 @@ DADOS_COPA_PONDERADO = {
     "Uruguai": {"grupo": "H", "hist_ataque": 1.9, "hist_defesa": 0.9, "elim_ataque": 2.1, "elim_defesa": 0.8, "escanteios": 5.6, "cartoes": 2.6, "faltas": 15.4, "atuacao_comentario": "Futebol de altíssima intensidade (pressão sufocante). Jogo muito vertical com forte contato."},
     # GRUPO I
     "França": {"grupo": "I", "hist_ataque": 2.5, "hist_defesa": 0.8, "elim_ataque": 2.6, "elim_defesa": 0.6, "escanteios": 6.4, "cartoes": 1.5, "faltas": 11.5, "atuacao_comentario": "Favorita destacada. Elenco cirúrgico e letal com poder de fogo devastador nos jogos recentes."},
-    "Iraque": {"grupo": "I", "hist_ataque": 1.2, "hist_defesa": 1.5, "elim_ataque": 1.3, "elim_defesa": 1.3, "escanteios": 4.2, "cartoes": 2.2, "faltas": 14.5, "atuacao_comentario": "Conquistou a vaga com base em bolas paradas e uma defesa aguerrida de forte imposição interna."},
+    "Iraque": {"grupo": "I", "hist_ataque": 1.2, "hist_defesa": 1.5, "elim_ataque": 1.3, "elim_defesa": 1.3, "escanteios": 4.2, "cartoes": 2.2, "faltas": 14.5, "atuacao_comentario": "Conquistou a vaga com base em bolas paradas e uma defesa aguerrida de forte imagem interna."},
     "Noruega": {"grupo": "I", "hist_ataque": 1.8, "hist_defesa": 1.2, "elim_ataque": 2.0, "elim_defesa": 1.0, "escanteios": 5.3, "cartoes": 1.9, "faltas": 12.0, "atuacao_comentario": "Ataque impulsionado por centroavante de elite mundial. Depende muito do ritmo de seus meias."},
     "Senegal": {"grupo": "I", "hist_ataque": 1.6, "hist_defesa": 1.0, "elim_ataque": 1.7, "elim_defesa": 0.9, "escanteios": 5.0, "cartoes": 2.1, "faltas": 14.3, "atuacao_comentario": "Principal força africana em balanço tático. Robusto no meio, rápido nas pontas e zaga segura."},
     # GRUPO J
@@ -127,19 +126,15 @@ def realizar_analise_completa(m_time, v_time, banco_dados, media_gols_base, eh_c
 
     # CÁLCULO DOS LAMBDAS (Gols Esperados por Equipe)
     if not eh_copa:
-        # Lógica Brasileirão: Força Base Multiplicativa + Mando de Campo + Forma Recente
         lambda_m = (t_m["ataque"] * FATOR_CASA_ATAQUE) * (t_v["defesa"] / media_gols_base) * t_m["forma"]
         lambda_v = (t_v["ataque"] * (t_m["defesa"] * FATOR_CASA_DEFESA) / media_gols_base) * t_v["forma"]
         base_ataque_m, base_ataque_v = t_m["ataque"], t_v["ataque"]
     else:
-        # LÓGICA DA COPA: Ponderação Pura (30% Histórico Geral / 70% Eliminatórias Recentes)
         ataque_ponderado_m = (t_m["hist_ataque"] * 0.3) + (t_m["elim_ataque"] * 0.7)
         defesa_ponderado_m = (t_m["hist_defesa"] * 0.3) + (t_m["elim_defesa"] * 0.7)
-
         ataque_ponderado_v = (t_v["hist_ataque"] * 0.3) + (t_v["elim_ataque"] * 0.7)
         defesa_ponderado_v = (t_v["hist_defesa"] * 0.3) + (t_v["elim_defesa"] * 0.7)
-
-        # Cruzamento direto das forças ponderadas calculadas (Campo Neutro)
+        
         lambda_m = ataque_ponderado_m * (defesa_ponderado_v / media_gols_base)
         lambda_v = ataque_ponderado_v * (defesa_ponderado_m / media_gols_base)
         base_ataque_m, base_ataque_v = ataque_ponderado_m, ataque_ponderado_v
@@ -148,6 +143,13 @@ def realizar_analise_completa(m_time, v_time, banco_dados, media_gols_base, eh_c
     max_gols = 6
     matriz_gols = pd.DataFrame(0.0, index=range(max_gols), columns=range(max_gols))
     prob_m, prob_v, prob_empate = 0.0, 0.0, 0.0
+    
+    # Variáveis dos novos mercados adicionados
+    prob_btts_sim = 0.0
+    prob_over_05 = 0.0
+    prob_over_15 = 0.0
+    prob_over_25 = 0.0
+    prob_over_35 = 0.0
 
     for g_m, g_v in itertools.product(range(max_gols), range(max_gols)):
         p_m = calcular_poisson(lambda_m, g_m)
@@ -155,6 +157,7 @@ def realizar_analise_completa(m_time, v_time, banco_dados, media_gols_base, eh_c
         p_combinada = p_m * p_v
         matriz_gols.at[g_m, g_v] = p_combinada
 
+        # 1X2 Probabilidades bases
         if g_m > g_v:
             prob_m += p_combinada
         elif g_v > g_m:
@@ -162,21 +165,39 @@ def realizar_analise_completa(m_time, v_time, banco_dados, media_gols_base, eh_c
         else:
             prob_empate += p_combinada
 
-    # Identificar a Moda da Distribuição (Placar isolado de maior probabilidade)
+        # Novo Mercado: Ambas Marcam (BTTS)
+        if g_m > 0 and g_v > 0:
+            prob_btts_sim += p_combinada
+
+        # Novo Mercado: Linhas de Gols Totais (Over)
+        total_gols = g_m + g_v
+        if total_gols > 0.5: prob_over_05 += p_combinada
+        if total_gols > 1.5: prob_over_15 += p_combinada
+        if total_gols > 2.5: prob_over_25 += p_combinada
+        if total_gols > 3.5: prob_over_35 += p_combinada
+
+    # Identificar a Moda da Distribuição
     placar_index = matriz_gols.stack().idxmax()
     prob_placar_moda = matriz_gols.at[placar_index[0], placar_index[1]]
 
-    # Conversão para Fair Odds Decimais
+    # Conversão para Fair Odds Decimais (1X2)
     odd_m = round(1 / prob_m, 2) if prob_m > 0 else 99.0
     odd_empate = round(1 / prob_empate, 2) if prob_empate > 0 else 99.0
     odd_v = round(1 / prob_v, 2) if prob_v > 0 else 99.0
+
+    # Novo Mercado: Chance Dupla (Double Chance)
+    prob_1x = prob_m + prob_empate
+    prob_x2 = prob_v + prob_empate
+    prob_12 = prob_m + prob_v
+    
+    odd_1x = round(1 / prob_1x, 2) if prob_1x > 0 else 99.0
+    odd_x2 = round(1 / prob_x2, 2) if prob_x2 > 0 else 99.0
+    odd_12 = round(1 / prob_12, 2) if prob_12 > 0 else 99.0
 
     # Projeção de Scouts baseados no Ritmo de Jogo gerado pelos xG
     fator_ritmo = (lambda_m + lambda_v) / (base_ataque_m + base_ataque_v)
     escanteios_proj = (t_m["escanteios"] + t_v["escanteios"]) * fator_ritmo
     cartoes_proj = t_m["cartoes"] + t_v["cartoes"]
-    
-    # Cálculo Dinâmico de Faltas Esperadas
     faltas_proj = (t_m["faltas"] + t_v["faltas"]) * (fator_ritmo * 0.95)
 
     return {
@@ -189,7 +210,12 @@ def realizar_analise_completa(m_time, v_time, banco_dados, media_gols_base, eh_c
         "cartoes": round(cartoes_proj, 1),
         "faltas": round(faltas_proj, 1),
         "gols_esperados_m": round(lambda_m, 2),
-        "gols_esperados_v": round(lambda_v, 2)
+        "gols_esperados_v": round(lambda_v, 2),
+        # Dados Novos Compilados
+        "btts_sim": prob_btts_sim, "btts_nao": 1.0 - prob_btts_sim,
+        "over_05": prob_over_05, "over_15": prob_over_15, "over_25": prob_over_25, "over_35": prob_over_35,
+        "prob_1x": prob_1x, "prob_x2": prob_x2, "prob_12": prob_12,
+        "odd_1x": odd_1x, "odd_x2": odd_x2, "odd_12": odd_12
     }
 
 
@@ -197,7 +223,7 @@ def realizar_analise_completa(m_time, v_time, banco_dados, media_gols_base, eh_c
 # 4. INTERFACE GRÁFICA INTERATIVA (STREAMLIT DASHBOARD)
 # ==============================================================================
 st.title("📊 Plataforma de Inteligência Preditiva & Fair Odds")
-st.markdown("Análise baseada em Cadeias de Poisson, Ajuste de Mando de Campo, Volume de Faltas e Peso de 70% para Eliminatórias Recentes.")
+st.markdown("Análise quantitativa com Cadeias de Poisson, Ajuste de Mando, Linhas de Gols (Over/Under) e Ambas Marcam.")
 
 tab_br, tab_copa = st.tabs(["🇧🇷 Campeonato Brasileiro (Série A)", "🌍 Copa do Mundo 2026"])
 
@@ -220,32 +246,57 @@ with tab_br:
         c_xg1.metric(f"Gols Esperados (xG) - {time_m}", res["gols_esperados_m"])
         c_xg2.metric(f"Gols Esperados (xG) - {time_v}", res["gols_esperados_v"])
 
-        st.markdown("### 🎲 Precificação de Mercado (Odds Justas Estipuladas)")
-        col_m, col_e, col_v = st.columns(3)
-        col_m.metric(f"Vitória {time_m}", f"{round(res['prob_m']*100, 1)}%", f"Odd Justa: @{res['odd_m']}")
-        col_e.metric("Empate", f"{round(res['prob_empate']*100, 1)}%", f"Odd Justa: @{res['odd_empate']}")
-        col_v.metric(f"Vitória {time_v}", f"{round(res['prob_v']*100, 1)}%", f"Odd Justa: @{res['odd_v']}")
+        # Layout em colunas para os blocos de mercado
+        st.markdown("### 🎲 Precificação de Mercados Primários (1X2 & Chance Dupla)")
+        col_m1, col_m2 = st.columns(2)
+        
+        with col_m1:
+            st.caption("**Mercado 1X2 Principal**")
+            st.markdown(f"**Vitoria {time_m}:** {round(res['prob_m']*100, 1)}% | **Odd:** @{res['odd_m']}")
+            st.markdown(f"**Empate:** {round(res['prob_empate']*100, 1)}% | **Odd:** @{res['odd_empate']}")
+            st.markdown(f"**Vitoria {time_v}:** {round(res['prob_v']*100, 1)}% | **Odd:** @{res['odd_v']}")
+            
+        with col_m2:
+            st.caption("**Mercado de Chance Dupla**")
+            st.markdown(f"**Mandante ou Empate (1X):** {round(res['prob_1x']*100, 1)}% | **Odd:** @{res['odd_1x']}")
+            st.markdown(f"**Visitante ou Empate (X2):** {round(res['prob_x2']*100, 1)}% | **Odd:** @{res['odd_x2']}")
+            st.markdown(f"**Qualquer Time Vence (12):** {round(res['prob_12']*100, 1)}% | **Odd:** @{res['odd_12']}")
 
-        # Renderização da Matriz de Calor
-        st.markdown("### 🗺️ Matriz de Dispersão de Gols (Concentração de Probabilidade)")
-        fig, ax = plt.subplots(figsize=(7, 3.5))
-        sns.heatmap(res["matriz"], annot=True, fmt=".2%", cmap="YlGnBu", xticklabels=range(6), yticklabels=range(6), ax=ax)
-        plt.xlabel(f"Gols do Visitante ({time_v})")
-        plt.ylabel(f"Gols do Mandante ({time_m})")
-        st.pyplot(fig)
+        # Novos Blocos: Gols e Ambas Marcam lado a lado
+        st.markdown("### ⚽ Mercados de Gols & Ambas Marcam (BTTS)")
+        col_g1, col_g2 = st.columns(2)
+        
+        with col_g1:
+            st.caption("**Probabilidade Over Gols**")
+            st.markdown(f"**Mais de 0.5 Gols:** {round(res['over_05']*100, 1)}% | **Odd Justa:** @{round(1/res['over_05'], 2)}")
+            st.markdown(f"**Mais de 1.5 Gols:** {round(res['over_15']*100, 1)}% | **Odd Justa:** @{round(1/res['over_15'], 2)}")
+            st.markdown(f"**Mais de 2.5 Gols:** {round(res['over_25']*100, 1)}% | **Odd Justa:** @{round(1/res['over_25'], 2)}")
+            st.markdown(f"**Mais de 3.5 Gols:** {round(res['over_35']*100, 1)}% | **Odd Justa:** @{round(1/res['over_35'], 2)}")
+            
+        with col_g2:
+            st.caption("**Ambas as Equipes Marcam**")
+            st.markdown(f"**SIM:** {round(res['btts_sim']*100, 1)}% | **Odd Justa:** @{round(1/res['btts_sim'], 2)}")
+            st.markdown(f"**NÃO:** {round(res['btts_nao']*100, 1)}% | **Odd Justa:** @{round(1/res['btts_nao'], 2)}")
 
-        # Scouts Alternativos (Agora incluindo Faltas)
-        st.markdown("### 📈 Projeção Estatística de Over/Under")
+        # Redução da Matriz dentro de um Menu Expansível Retrátil
+        with st.expander("🗺️ Ver Matriz Colorida de Probabilidade de Gols (Opcional)"):
+            fig, ax = plt.subplots(figsize=(4.5, 2.2))  # Tamanho reduzido
+            sns.heatmap(res["matriz"], annot=True, fmt=".1%", cmap="YlGnBu", xticklabels=range(6), yticklabels=range(6), ax=ax, annot_kws={"size": 6})
+            ax.tick_params(labelsize=6)
+            plt.xlabel(f"Gols do Visitante ({time_v})", fontsize=6)
+            plt.ylabel(f"Gols do Mandante ({time_m})", fontsize=6)
+            st.pyplot(fig)
+
+        st.markdown("### 📈 Projeção Estatística de Disciplina e Cantos")
         st.table({
             "Mercado de Estatísticas": ["Linha de Escanteios Totais", "Linha de Cartões Amarelos Totais", "Linha de Faltas Totais Cometidas"],
             "Projeção do Modelo Quant": [res["escanteios"], res["cartoes"], res["faltas"]]
         })
 
-# --- CONFIGURAÇÃO DA ABA COPA DO MUNDO (TODAS AS 48 SELEÇÕES) ---
+# --- CONFIGURAÇÃO DA ABA COPA DO MUNDO ---
 with tab_copa:
     col1, col2 = st.columns(2)
     with col1:
-        # Agrupamento opcional visual por ordem alfabética de todas as 48 seleções
         lista_completa_copa = sorted(list(DADOS_COPA_PONDERADO.keys()))
         selec_m = st.selectbox("Seleção Mandante", lista_completa_copa, index=lista_completa_copa.index("Brasil"))
     with col2:
@@ -254,39 +305,53 @@ with tab_copa:
     if selec_m == selec_v:
         st.warning("Selecione seleções diferentes para o confronto da Copa.")
     else:
-        # Executa modelo aplicando a proporção de 70% nas eliminatórias recentes
         res_c = realizar_analise_completa(selec_m, selec_v, DADOS_COPA_PONDERADO, MEDIA_GOLS_FIFA, eh_copa=True)
         
-        # Card Informativo de Análise de Desempenho Recente
         st.markdown("### 📝 Relatório de Atuação Recente (Peso de 70% nas Eliminatórias)")
         col_rep1, col_rep2 = st.columns(2)
-        with col_rep1:
-            st.info(f"**{selec_m} (Grupo {DADOS_COPA_PONDERADO[selec_m]['grupo']}):** {DADOS_COPA_PONDERADO[selec_m]['atuacao_comentario']}")
-        with col_rep2:
-            st.info(f"**{selec_v} (Grupo {DADOS_COPA_PONDERADO[selec_v]['grupo']}):** {DADOS_COPA_PONDERADO[selec_v]['atuacao_comentario']}")
+        with col_rep1: st.info(f"**{selec_m}:** {DADOS_COPA_PONDERADO[selec_m]['atuacao_comentario']}")
+        with col_rep2: st.info(f"**{selec_v}:** {DADOS_COPA_PONDERADO[selec_v]['atuacao_comentario']}")
             
-        st.markdown("---")
-
         cm_mod, cm_xg1, cm_xg2 = st.columns(3)
         cm_mod.metric("Placar Isolado Mais Provável", res_c["placar_moda"], f"{round(res_c['prob_placar']*100, 1)}% de chance")
         cm_xg1.metric(f"xG Ponderado - {selec_m}", res_c["gols_esperados_m"])
         cm_xg2.metric(f"xG Ponderado - {selec_v}", res_c["gols_esperados_v"])
 
-        st.markdown("### 🎲 Odds Justas e Probabilidades Reais")
-        colm_m, colm_e, colm_v = st.columns(3)
-        colm_m.metric(f"Vitória {selec_m}", f"{round(res_c['prob_m']*100, 1)}%", f"Odd: @{res_c['odd_m']}")
-        colm_e.metric("Empate", f"{round(res_c['prob_empate']*100, 1)}%", f"Odd: @{res_c['odd_empate']}")
-        colm_v.metric(f"Vitória {selec_v}", f"{round(res_c['prob_v']*100, 1)}%", f"Odd: @{res_c['odd_v']}")
+        st.markdown("### 🎲 Precificação de Mercados Primários (Copa do Mundo)")
+        col_cm1, col_cm2 = st.columns(2)
+        with col_cm1:
+            st.caption("**Mercado 1X2 Principal**")
+            st.markdown(f"**Vitoria {selec_m}:** {round(res_c['prob_m']*100, 1)}% | **Odd:** @{res_c['odd_m']}")
+            st.markdown(f"**Empate:** {round(res_c['prob_empate']*100, 1)}% | **Odd:** @{res_c['odd_empate']}")
+            st.markdown(f"**Vitoria {selec_v}:** {round(res_c['prob_v']*100, 1)}% | **Odd:** @{res_c['odd_v']}")
+        with col_cm2:
+            st.caption("**Mercado de Chance Dupla**")
+            st.markdown(f"**Mandante ou Empate (1X):** {round(res_c['prob_1x']*100, 1)}% | **Odd:** @{res_c['odd_1x']}")
+            st.markdown(f"**Visitante ou Empate (X2):** {round(res_c['prob_x2']*100, 1)}% | **Odd:** @{res_c['odd_x2']}")
+            st.markdown(f"**Qualquer Time Vence (12):** {round(res_c['prob_12']*100, 1)}% | **Odd:** @{res_c['odd_12']}")
 
-        # Matriz de Calor da Copa
-        st.markdown("### 🗺️ Matriz de Probabilidade de Placar Exato")
-        fig_c, ax_c = plt.subplots(figsize=(7, 3.5))
-        sns.heatmap(res_c["matriz"], annot=True, fmt=".2%", cmap="Oranges", xticklabels=range(6), yticklabels=range(6), ax=ax_c)
-        plt.xlabel(f"Gols de {selec_v}")
-        plt.ylabel(f"Gols de {selec_m}")
-        st.pyplot(fig_c)
+        st.markdown("### ⚽ Mercados de Gols & Ambas Marcam (Copa do Mundo)")
+        col_cg1, col_cg2 = st.columns(2)
+        with col_cg1:
+            st.caption("**Probabilidade Over Gols**")
+            st.markdown(f"**Mais de 0.5 Gols:** {round(res_c['over_05']*100, 1)}% | **Odd Justa:** @{round(1/res_c['over_05'], 2)}")
+            st.markdown(f"**Mais de 1.5 Gols:** {round(res_c['over_15']*100, 1)}% | **Odd Justa:** @{round(1/res_c['over_15'], 2)}")
+            st.markdown(f"**Mais de 2.5 Gols:** {round(res_c['over_25']*100, 1)}% | **Odd Justa:** @{round(1/res_c['over_25'], 2)}")
+            st.markdown(f"**Mais de 3.5 Gols:** {round(res_c['over_35']*100, 1)}% | **Odd Justa:** @{round(1/res_c['over_35'], 2)}")
+        with col_cg2:
+            st.caption("**Ambas as Equipes Marcam**")
+            st.markdown(f"**SIM:** {round(res_c['btts_sim']*100, 1)}% | **Odd Justa:** @{round(1/res_c['btts_sim'], 2)}")
+            st.markdown(f"**NÃO:** {round(res_c['btts_nao']*100, 1)}% | **Odd Justa:** @{round(1/res_c['btts_nao'], 2)}")
+
+        # Redução da Matriz na aba Copa
+        with st.expander("🗺️ Ver Matriz Colorida de Probabilidade de Gols (Opcional)"):
+            fig_c, ax_c = plt.subplots(figsize=(4.5, 2.2))
+            sns.heatmap(res_c["matriz"], annot=True, fmt=".1%", cmap="Oranges", xticklabels=range(6), yticklabels=range(6), ax=ax_c, annot_kws={"size": 6})
+            ax_c.tick_params(labelsize=6)
+            plt.xlabel(f"Gols de {selec_v}", fontsize=6)
+            plt.ylabel(f"Gols de {selec_m}", fontsize=6)
+            st.pyplot(fig_c)
         
-        # Tabela contendo a nova linha de faltas da Copa
         st.markdown("### 📈 Projeção de Scouts")
         st.table({
             "Mercado de Estatísticas": ["Linha de Escanteios Totais", "Linha de Cartões Amarelos Totais", "Linha de Faltas Totais Cometidas"],
