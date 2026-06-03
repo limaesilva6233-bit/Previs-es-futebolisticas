@@ -13,10 +13,10 @@ st.set_page_config(
 )
 
 # ==============================================================================
-# CONFIGURAÇÃO DO GOOGLE SHEETS (AUTOMATIZAÇÃO DOS JOGOS)
+# CONFIGURAÇÃO DO GOOGLE SHEETS (VIA EXCEL PARSE)
 # ==============================================================================
 ID_DA_PLANILHA = "1qudxtcLg7y_iw0dxxCN318IWX1LdnEb2X4SaBNvuV4I"
-URL_PLANILHA = f"https://docs.google.com/spreadsheets/d/{ID_DA_PLANILHA}/gviz/tq?tqx=out:csv"
+URL_PLANILHA = f"https://docs.google.com/spreadsheets/d/{ID_DA_PLANILHA}/export?format=xlsx"
 
 # Constantes de Calibração Estatística Globais
 MEDIA_GOLS_SÉRIE_A = 1.28
@@ -94,7 +94,7 @@ DADOS_COPA_PONDERADO = {
     "Portugal": {"grupo": "K", "hist_ataque": 2.4, "hist_defesa": 0.8, "elim_ataque": 2.5, "elim_defesa": 0.7, "escanteios": 6.3, "cartoes": 1.9, "faltas": 11.4},
     "RD do Congo": {"grupo": "K", "hist_ataque": 1.3, "hist_defesa": 1.3, "elim_ataque": 1.4, "elim_defesa": 1.1, "escanteios": 4.5, "cartoes": 2.4, "faltas": 15.5},
     "Uzbequistão": {"grupo": "K", "hist_ataque": 1.2, "hist_defesa": 1.2, "elim_ataque": 1.4, "elim_defesa": 1.0, "escanteios": 4.4, "cartoes": 1.8, "faltas": 13.2},
-    "Colômbia": {"grupo": "K", "hist_ataque": 1.8, "hist_defesa": 0.9, "elim_ataque": 2.0, "elim_defesa": 0.8, "escanteios": 5.4, "cartoes": 2.7, "faltas": 14.9},
+    "Colômbia": {"grupo": "K", "hist_ataque": 1.8, "high_defesa": 0.9, "elim_ataque": 2.0, "elim_defesa": 0.8, "escanteios": 5.4, "cartoes": 2.7, "faltas": 14.9},
     "Inglaterra": {"grupo": "L", "hist_ataque": 2.3, "hist_defesa": 0.8, "elim_ataque": 2.4, "elim_defesa": 0.7, "escanteios": 6.6, "cartoes": 1.4, "faltas": 11.2},
     "Croácia": {"grupo": "L", "hist_ataque": 1.6, "hist_defesa": 1.0, "elim_ataque": 1.5, "elim_defesa": 0.9, "escanteios": 5.2, "cartoes": 1.8, "faltas": 12.1},
     "Gana": {"grupo": "L", "hist_ataque": 1.4, "hist_defesa": 1.4, "elim_ataque": 1.5, "elim_defesa": 1.2, "escanteios": 4.7, "cartoes": 2.3, "faltas": 14.8},
@@ -193,7 +193,7 @@ def realizar_analise_completa(m_time, v_time, banco_dados, media_gols_base, eh_c
     }
 
 # ==============================================================================
-# INTERFACE GRÁFICA INTERATIVA (STREAMLIT DASHBOARD)
+# INTERFACE INTERATIVA (STREAMLIT DASHBOARD)
 # ==============================================================================
 st.title("📊 Preditor Quantitativo Pro - Especial Bolão Copa 2026")
 
@@ -205,7 +205,7 @@ with tab_br:
     with col2: time_v = st.selectbox("Visitante (Fora)", sorted(list(DADOS_BRASILEIRAO.keys())), index=1)
     
     if time_m == time_v:
-        st.warning("⚠️ Selecione dois times diferentes para rodar a simulação do Brasileirão.")
+        st.warning("⚠️ Selecione dois times diferentes.")
     else:
         res = realizar_analise_completa(time_m, time_v, DADOS_BRASILEIRAO, MEDIA_GOLS_SÉRIE_A)
         c_mod, c_xg1, c_xg2 = st.columns(3)
@@ -213,12 +213,9 @@ with tab_br:
         c_xg1.metric(f"xG - {time_m}", res["gols_esperados_m"])
         c_xg2.metric(f"xG - {time_v}", res["gols_esperados_v"])
 
-        # Matriz de Probabilidades do Brasileirão
         with st.expander("📊 Ver Matriz de Probabilidades Estendida"):
             fig, ax = plt.subplots(figsize=(6, 4))
             sns.heatmap(res["matriz"], annot=True, fmt=".1%", cmap="YlOrBr", ax=ax, xticklabels=range(6), yticklabels=range(6))
-            ax.set_xlabel(f"Gols - {time_v}")
-            ax.set_ylabel(f"Gols - {time_m}")
             st.pyplot(fig)
 
 with tab_copa:
@@ -228,7 +225,7 @@ with tab_copa:
     with col_c2: selec_v = st.selectbox("Seleção B", lista_completa_copa, index=lista_completa_copa.index("Marrocos"))
 
     if selec_m == selec_v:
-        st.warning("⚠️ Selecione duas seleções diferentes para rodar a análise de Copa.")
+        st.warning("⚠️ Selecione duas seleções diferentes.")
     else:
         res_c = realizar_analise_completa(selec_m, selec_v, DADOS_COPA_PONDERADO, MEDIA_GOLS_FIFA, eh_copa=True)
         
@@ -246,81 +243,69 @@ with tab_copa:
             st.markdown(f"**Ambas Marcam - SIM:** {round(res_c['btts_sim']*100, 1)}%")
             st.markdown(f"**Ambas Marcam - NÃO:** {round(res_c['btts_nao']*100, 1)}%")
 
-        # Matriz de Probabilidades da Copa
-        with st.expander("📊 Ver Matriz Colorida de Probabilidades"):
-            fig, ax = plt.subplots(figsize=(6, 4))
-            sns.heatmap(res_c["matriz"], annot=True, fmt=".1%", cmap="Blues", ax=ax, xticklabels=range(6), yticklabels=range(6))
-            ax.set_xlabel(f"Gols - {selec_v}")
-            ax.set_ylabel(f"Gols - {selec_m}")
-            st.pyplot(fig)
-
 # ==============================================================================
-# NOVA ABA: HISTÓRICO INTEGRADO AUTOMÁTICO COM GOOGLE SHEETS
+# AUDITORIA TOTALMENTE PROCESSADA EM SEGUNDO PLANO (SEM INPUTS DUPLICADOS)
 # ==============================================================================
 with tab_auditoria:
-    st.header("🏆 Auditoria de Performance em Tempo Real (Google Sheets)")
-    st.markdown("Esta aba se conecta diretamente ao seu Google Sheets. Ela puxa os resultados oficiais salvos na planilha, cruza com a sugestão do algoritmo e calcula o seu placar geral automaticamente.")
+    st.header("🏆 Auditoria de Performance em Tempo Real")
+    st.markdown("Esta aba calcula automaticamente a pontuação que o algoritmo obteria com base nos resultados preenchidos na sua planilha.")
 
-    if ID_DA_PLANILHA == "SEU_ID_LONGO_DA_PLANILHA_AQUI":
-        st.info("💡 Para ativar o rastreamento automático de pontos, configure o `ID_DA_PLANILHA` no código do app com o ID da sua planilha pública do Google Sheets.")
-    else:
-        try:
-            # Baixa os dados tratando erros de colunas extras gerados por delimitadores soltos na tabela
-            df_sheets = pd.read_csv(
-                URL_PLANILHA, 
-                on_bad_lines='skip',
-                usecols=['Selecao_A', 'Selecao_B', 'Gols_A', 'Gols_B', 'Mata_Mata']
-            )
+    try:
+        df_sheets = pd.read_excel(URL_PLANILHA)
+        df_sheets.columns = df_sheets.columns.str.strip()
+        
+        colunas_obrigatorias = ['Selecao_A', 'Selecao_B', 'Gols_A', 'Gols_B', 'Mata_Mata']
+        
+        if all(col in df_sheets.columns for col in colunas_obrigatorias):
+            # Filtra apenas linhas onde os gols foram preenchidos (jogos encerrados)
+            df_encerrados = df_sheets.dropna(subset=['Gols_A', 'Gols_B']).copy()
             
-            # Limpa espaços em branco dos nomes de colunas
-            df_sheets.columns = df_sheets.columns.str.strip()
-            
-            # Filtra apenas os jogos que já possuem resultados válidos preenchidos
-            df_encerrados = df_sheets.dropna(subset=['Gols_A', 'Gols_B'])
-            df_encerrados = df_encerrados[(df_encerrados['Gols_A'] >= 0) & (df_encerrados['Gols_B'] >= 0)]
+            # Garante tipo numérico para evitar bugs matemáticos
+            df_encerrados['Gols_A'] = pd.to_numeric(df_encerrados['Gols_A'], errors='coerce')
+            df_encerrados['Gols_B'] = pd.to_numeric(df_encerrados['Gols_B'], errors='coerce')
+            df_encerrados = df_encerrados.dropna(subset=['Gols_A', 'Gols_B'])
 
-            if len(df_encerrados) > 0:
-                historico_calculado = []
+            historico_calculado = []
+            
+            # O processamento roda silenciosamente aqui (NENHUM componente visual st. é criado aqui dentro)
+            for _, linha in df_encerrados.iterrows():
+                time_a = str(linha['Selecao_A']).strip()
+                time_v = str(linha['Selecao_B']).strip()
+                gols_a_real = int(linha['Gols_A'])
+                gols_b_real = int(linha['Gols_B'])
+                eh_mata = int(linha['Mata_Mata']) == 1
                 
-                for _, linha in df_encerrados.iterrows():
-                    time_a = str(linha['Selecao_A']).strip()
-                    time_b = str(linha['Selecao_B']).strip()
-                    gols_a_real = int(linha['Gols_A'])
-                    gols_b_real = int(linha['Gols_B'])
+                if time_a in DADOS_COPA_PONDERADO and time_v in DADOS_COPA_PONDERADO:
+                    analise_retroativa = realizar_analise_completa(time_a, time_v, DADOS_COPA_PONDERADO, MEDIA_GOLS_FIFA, eh_copa=True)
                     
-                    eh_mata = int(linha['Mata_Mata']) == 1 if 'Mata_Mata' in linha else False
+                    g_a_sugerido = analise_retroativa["placar_moda_m"]
+                    g_v_sugerido = analise_retroativa["placar_moda_v"]
+                    
+                    pontos = computar_pontos_bolao(g_a_sugerido, g_v_sugerido, gols_a_real, gols_b_real, eh_mata_mata=eh_mata)
+                    
+                    historico_calculado.append({
+                        "Partida": f"{time_a} x {time_v}",
+                        "Tipo": "Mata-Mata" if eh_mata else "Fase de Grupos",
+                        "Sugestão do App": anonymity_fix := analise_retroativa["placar_moda_str"],
+                        "Placar Real Oficial": f"{gols_a_real} x {gols_b_real}",
+                        "Pontos Obtidos": pontos
+                    })
 
-                    if time_a in DADOS_COPA_PONDERADO and time_b in DADOS_COPA_PONDERADO:
-                        analise_retroativa = realizar_analise_completa(time_a, time_b, DADOS_COPA_PONDERADO, MEDIA_GOLS_FIFA, eh_copa=True)
-                        
-                        g_a_sugerido = analise_retroativa["placar_moda_m"]
-                        g_b_sugerido = analise_retroativa["placar_moda_v"]
-                        
-                        pontos = computar_pontos_bolao(g_a_sugerido, g_b_sugerido, gols_a_real, gols_b_real, eh_mata_mata=eh_mata)
-                        
-                        historico_calculado.append({
-                            "Partida": f"{time_a} x {time_b}",
-                            "Tipo": "Mata-Mata" if eh_mata else "Fase de Grupos",
-                            "Sugestão do App": analise_retroativa["placar_moda_str"],
-                            "Placar Real Oficial": f"{gols_a_real} x {gols_b_real}",
-                            "Pontos Obtidos": pontos
-                        })
-
-                if len(historico_calculado) > 0:
-                    df_final = pd.DataFrame(historico_calculado)
-                    total_pontos = df_final["Pontos Obtidos"].sum()
-                    
-                    c_m1, c_m2 = st.columns(2)
-                    c_m1.metric("🎯 Total Acumulado pelo App", f"{total_pontos} pts")
-                    c_m2.metric("🏁 Jogos Processados", f"{len(df_final)} de 104")
-                    
-                    st.markdown("#### 📋 Histórico Consolidado de Resultados")
-                    st.dataframe(df_final, use_container_width=True)
-                else:
-                    st.warning("⚠️ Os times listados na planilha não coincidem com os nomes das seleções cadastradas no App.")
+            if len(historico_calculado) > 0:
+                df_final = pd.DataFrame(historico_calculado)
+                total_pontos = df_final["Pontos Obtidos"].sum()
+                
+                # Exibição limpa dos resultados consolidados
+                c_m1, c_m2 = st.columns(2)
+                c_m1.metric("🎯 Total Acumulado pelo App", f"{total_pontos} pts")
+                c_m2.metric("🏁 Jogos Encerrados Processados", f"{len(df_final)} partidas")
+                
+                st.markdown("#### 📋 Histórico de Cruzamento (Modelo vs Realidade)")
+                st.dataframe(df_final, use_container_width=True)
             else:
-                st.info("📅 Nenhum jogo foi encerrado ainda na planilha. Adicione os gols dos jogos finalizados lá para ver os pontos subirem aqui!")
-                
-        except Exception as e:
-            st.error(f"Não foi possível processar a tabela do Google Sheets: {e}")
-            st.info("Ajuste as colunas da planilha para corrigir os dados. Enquanto isso, as abas de previsão continuam funcionando normalmente!")
+                st.info("📅 Preencha os placares de gols na sua planilha para ver os pontos computados aqui!")
+        else:
+            st.error(f"⚠️ As colunas lidas não batem. Nomes esperados: {colunas_obrigatorias}")
+            
+    except Exception as e:
+        st.error(f"Erro ao processar estrutura: {e}")
