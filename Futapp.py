@@ -12,14 +12,18 @@ st.set_page_config(
     layout="wide",
 )
 
+# Inicialização do Banco de Dados de Auditoria na Memória do App
+if "historico_bolao" not in st.session_state:
+    st.session_state.historico_bolao = []
+
 # Constantes de Calibração Estatística Globais
 MEDIA_GOLS_SÉRIE_A = 1.28
 MEDIA_GOLS_FIFA = 1.35
-FATOR_CASA_ATAQUE = 1.15  # Mandante ganha +15% de força ofensiva no Brasileirão
-FATOR_CASA_DEFESA = 0.85  # Mandante reduz em 15% os gols sofridos no Brasileirão
+FATOR_CASA_ATAQUE = 1.15  
+FATOR_CASA_DEFESA = 0.85  
 
 # ==============================================================================
-# 1. BANCO DE DADOS COMPLETO: OS 20 TIMES DA SÉRIE A DO BRASILEIRÃO
+# BANCOS DE DADOS (BRASILEIRÃO & COPA)
 # ==============================================================================
 DADOS_BRASILEIRAO = {
     "Athletico-PR": {"ataque": 1.5, "defesa": 1.1, "forma": 0.98, "escanteios": 5.5, "cartoes": 2.5, "faltas": 14.2},
@@ -44,316 +48,292 @@ DADOS_BRASILEIRAO = {
     "Vasco": {"ataque": 1.3, "defesa": 1.3, "forma": 0.95, "escanteios": 4.8, "cartoes": 2.7, "faltas": 15.0},
 }
 
-# ==============================================================================
-# 2. BANCO DE DADOS COMPLETO: AS 48 SELEÇÕES DA COPA DO MUNDO 2026
-# ==============================================================================
 DADOS_COPA_PONDERADO = {
-    # GRUPO A
-    "México": {"grupo": "A", "hist_ataque": 1.8, "hist_defesa": 1.1, "elim_ataque": 1.6, "elim_defesa": 1.2, "escanteios": 5.4, "cartoes": 2.1, "faltas": 13.2, "atuacao_comentario": "Sólido jogando em casa, mas com dificuldades de criação contra defesas fechadas europeias."},
-    "África do Sul": {"grupo": "A", "hist_ataque": 1.2, "hist_defesa": 1.3, "elim_ataque": 1.3, "elim_defesa": 1.1, "escanteios": 4.6, "cartoes": 1.9, "faltas": 14.5, "atuacao_comentario": "Campanha surpreendente e física no continente africano, baseada em contra-ataques velozes."},
-    "Coreia do Sul": {"grupo": "A", "hist_ataque": 1.6, "hist_defesa": 1.0, "elim_ataque": 1.8, "elim_defesa": 0.9, "escanteios": 5.1, "cartoes": 1.5, "faltas": 11.2, "atuacao_comentario": "Dominante nas eliminatórias asiáticas com transição ofensiva muito rápida organizada e limpa."},
-    "Chéquia": {"grupo": "A", "hist_ataque": 1.5, "hist_defesa": 1.2, "elim_ataque": 1.4, "elim_defesa": 1.1, "escanteios": 4.9, "cartoes": 2.3, "faltas": 13.8, "atuacao_comentario": "Jogo aéreo muito forte e físico, garantiu vaga com consistência na repescagem europeia."},
-    # GRUPO B
-    "Canadá": {"grupo": "B", "hist_ataque": 1.5, "hist_defesa": 1.2, "elim_ataque": 1.7, "elim_defesa": 1.1, "escanteios": 5.2, "cartoes": 1.8, "faltas": 12.9, "atuacao_comentario": "Grande evolução de ritmo e volume ofensivo pelas pontas nas partidas recentes da CONCACAF."},
-    "Bósnia e Herzegovina": {"grupo": "B", "hist_ataque": 1.3, "hist_defesa": 1.4, "elim_ataque": 1.2, "elim_defesa": 1.3, "escanteios": 4.7, "cartoes": 2.5, "faltas": 14.7, "atuacao_comentario": "Equipe muito truncada e faltosa. Conquistou pontos importantes jogando de forma reativa."},
-    "Catar": {"grupo": "B", "hist_ataque": 1.1, "hist_defesa": 1.6, "elim_ataque": 1.3, "elim_defesa": 1.5, "escanteios": 4.1, "cartoes": 2.0, "faltas": 12.1, "atuacao_comentario": "Organizado taticamente, mas possui sérias desvantagens de imposição física contra elencos de elite."},
-    "Suíça": {"grupo": "B", "hist_ataque": 1.6, "hist_defesa": 1.0, "elim_ataque": 1.7, "elim_defesa": 0.9, "escanteios": 5.5, "cartoes": 1.7, "faltas": 12.5, "atuacao_comentario": "Altíssima disciplina tática. Modelo defensivo sólido que pune os erros adversários com eficácia."},
-    # GRUPO C
-    "Brasil": {"grupo": "C", "hist_ataque": 2.5, "hist_defesa": 0.6, "elim_ataque": 1.6, "elim_defesa": 1.1, "escanteios": 6.8, "cartoes": 1.6, "faltas": 13.2, "atuacao_comentario": "Oscilante nas Eliminatórias. Transições defensivas problemáticas e dificuldades contra blocos baixos."},
-    "Marrocos": {"grupo": "C", "hist_ataque": 1.9, "hist_defesa": 0.8, "elim_ataque": 2.2, "elim_defesa": 0.7, "escanteios": 5.6, "cartoes": 2.1, "faltas": 14.0, "atuacao_comentario": "Excelente fase. Passou o trator na África com estilo muito mais agressivo do que na Copa passada."},
-    "Haiti": {"grupo": "C", "hist_ataque": 0.8, "hist_defesa": 2.4, "elim_ataque": 1.0, "elim_defesa": 2.0, "escanteios": 3.5, "cartoes": 2.4, "faltas": 16.0, "atuacao_comentario": "Vaga histórica conquistada na retranca. Apresenta sérias fragilidades se sofrer gol cedo."},
-    "Escócia": {"grupo": "C", "hist_ataque": 1.3, "hist_defesa": 1.4, "elim_ataque": 1.4, "elim_defesa": 1.2, "escanteios": 4.8, "cartoes": 2.2, "faltas": 14.2, "atuacao_comentario": "Futebol britânico clássico de muita entrega física, forte marcação e bolas paradas perigosas."},
-    # GRUPO D
-    "Estados Unidos": {"grupo": "D", "hist_ataque": 1.9, "hist_defesa": 1.0, "elim_ataque": 1.8, "elim_defesa": 0.9, "escanteios": 5.8, "cartoes": 1.9, "faltas": 12.2, "atuacao_comentario": "Geração veloz com boa intensidade de pressão na saída de bola adversária durante a preparação."},
-    "Paraguai": {"grupo": "D", "hist_ataque": 1.1, "hist_defesa": 0.9, "elim_ataque": 1.0, "elim_defesa": 0.8, "escanteios": 4.5, "cartoes": 2.8, "faltas": 16.5, "atuacao_comentario": "A menor média de gols somados das eliminatórias. Jogo extremamente faltoso, truncado e focado em travar o rival."},
-    "Austrália": {"grupo": "D", "hist_ataque": 1.4, "hist_defesa": 1.2, "elim_ataque": 1.3, "elim_defesa": 1.1, "escanteios": 5.0, "cartoes": 1.8, "faltas": 13.5, "atuacao_comentario": "Jogo físico de recomposição rápida. Garante estabilidade atrás, mas cria pouco no ataque."},
-    "Turquia": {"grupo": "D", "hist_ataque": 1.7, "hist_defesa": 1.3, "elim_ataque": 1.8, "elim_defesa": 1.1, "escanteios": 5.3, "cartoes": 2.6, "faltas": 14.8, "atuacao_comentario": "Equipe muito técnica e imprevisível. Costuma protagonizar jogos abertos e indisciplinados."},
-    # GRUPO E
-    "Alemanha": {"grupo": "E", "hist_ataque": 2.3, "hist_defesa": 0.9, "elim_ataque": 2.2, "elim_defesa": 0.9, "escanteios": 6.5, "cartoes": 1.8, "faltas": 11.9, "atuacao_comentario": "Grande evolução sob novo comando tático, retomando o controle possessivo do meio-campo."},
-    "Curaçao": {"grupo": "E", "hist_ataque": 0.7, "hist_defesa": 2.5, "elim_ataque": 0.9, "elim_defesa": 2.1, "escanteios": 3.4, "cartoes": 2.3, "faltas": 15.2, "atuacao_comentario": "A maior zebra das Américas. Elenco esforçado, mas com sérios problemas de posicionamento na zaga."},
-    "Costa do Marfim": {"grupo": "E", "hist_ataque": 1.6, "hist_defesa": 1.1, "elim_ataque": 1.8, "elim_defesa": 1.0, "escanteios": 5.2, "cartoes": 2.2, "faltas": 14.1, "atuacao_comentario": "Futebol vertical de altíssima força física e imposição nas divididas de meio de campo."},
-    "Equador": {"grupo": "E", "hist_ataque": 1.5, "hist_defesa": 1.0, "elim_ataque": 1.4, "elim_defesa": 0.8, "escanteios": 5.1, "cartoes": 2.4, "faltas": 15.0, "atuacao_comentario": "Defesa fortíssima e veloz na transição. Jogo de muita imposição física e intensidade atlética."},
-    # GRUPO F
-    "Holanda": {"grupo": "F", "hist_ataque": 2.1, "hist_defesa": 0.9, "elim_ataque": 2.3, "elim_defesa": 0.8, "escanteios": 6.1, "cartoes": 1.7, "faltas": 12.4, "atuacao_comentario": "Futebol total com alas agressivos. Excelente aproveitamento ofensivo nas eliminatórias europeias."},
-    "Japão": {"grupo": "F", "hist_ataque": 1.8, "hist_defesa": 1.0, "elim_ataque": 2.1, "elim_defesa": 0.7, "escanteios": 5.5, "cartoes": 1.3, "faltas": 10.5, "atuacao_comentario": "Campanha irretocável na Ásia. Dinâmica coletiva espetacular e baixíssimo número de faltas cometidas."},
-    "Suécia": {"grupo": "F", "hist_ataque": 1.6, "hist_defesa": 1.1, "elim_ataque": 1.5, "elim_defesa": 1.0, "escanteios": 5.4, "cartoes": 2.0, "faltas": 13.0, "atuacao_comentario": "Jogo compacto, disciplinado e de forte recomposição pelas linhas de quatro defensores."},
-    "Tunísia": {"grupo": "F", "hist_ataque": 1.1, "hist_defesa": 1.3, "elim_ataque": 1.2, "elim_defesa": 1.1, "escanteios": 4.2, "cartoes": 2.2, "faltas": 14.9, "atuacao_comentario": "Estilo focado em quebrar o ritmo dos favoritos usando forte contato físico na intermediária."},
-    # GRUPO G
-    "Bélgica": {"grupo": "G", "hist_ataque": 2.0, "hist_defesa": 1.0, "elim_ataque": 1.9, "elim_defesa": 1.1, "escanteios": 5.9, "cartoes": 1.6, "faltas": 11.8, "atuacao_comentario": "Transição de geração em andamento. Mantém qualidade técnica alta, mas cedeu espaços na zaga."},
-    "Egito": {"grupo": "G", "hist_ataque": 1.4, "hist_defesa": 1.1, "elim_ataque": 1.5, "elim_defesa": 1.0, "escanteios": 4.6, "cartoes": 2.1, "faltas": 13.4, "atuacao_comentario": "Futebol focado em lançamentos longos e jogadas individuais rápidas de seus atacantes de ponta."},
-    "Irã": {"grupo": "G", "hist_ataque": 1.3, "hist_defesa": 1.2, "elim_ataque": 1.4, "elim_defesa": 1.1, "escanteios": 4.4, "cartoes": 2.3, "faltas": 14.2, "atuacao_comentario": "Uma das defesas mais consolidadas da Ásia. Sabe sofrer e travar partidas contra gigantes."},
-    "Nova Zelândia": {"grupo": "G", "hist_ataque": 1.0, "hist_defesa": 1.7, "elim_ataque": 1.2, "elim_defesa": 1.4, "escanteios": 3.9, "cartoes": 1.7, "faltas": 13.1, "atuacao_comentario": "Dominou a Oceania com folga, mas o ritmo competitivo local é abaixo dos padrões de Copa."},
-    # GRUPO H
-    "Espanha": {"grupo": "H", "hist_ataque": 2.3, "hist_defesa": 0.8, "elim_ataque": 2.4, "elim_defesa": 0.6, "escanteios": 6.7, "cartoes": 1.5, "faltas": 11.0, "atuacao_comentario": "Futebol de extrema posse e sufocamento. Sofre pouquíssimas faltas e finaliza com alta precisão."},
-    "Cabo Verde": {"grupo": "H", "hist_ataque": 1.1, "hist_defesa": 1.5, "elim_ataque": 1.3, "elim_defesa": 1.3, "escanteios": 4.0, "cartoes": 2.1, "faltas": 14.6, "atuacao_comentario": "Classificação heroica. Coletivo muito bem encaixado com transições rápidas pelos lados."},
-    "Arábia Saudita": {"grupo": "H", "hist_ataque": 1.2, "hist_defesa": 1.4, "elim_ataque": 1.3, "elim_defesa": 1.2, "escanteios": 4.3, "cartoes": 2.4, "faltas": 13.9, "atuacao_comentario": "Time veloz e intenso em casa, mas que costuma apresentar desatenções táticas na Europa/Américas."},
-    "Uruguai": {"grupo": "H", "hist_ataque": 1.9, "hist_defesa": 0.9, "elim_ataque": 2.1, "elim_defesa": 0.8, "escanteios": 5.6, "cartoes": 2.6, "faltas": 15.4, "atuacao_comentario": "Futebol de altíssima intensidade (pressão sufocante). Jogo muito vertical com forte contato."},
-    # GRUPO I
-    "França": {"grupo": "I", "hist_ataque": 2.5, "hist_defesa": 0.8, "elim_ataque": 2.6, "elim_defesa": 0.6, "escanteios": 6.4, "cartoes": 1.5, "faltas": 11.5, "atuacao_comentario": "Favorita destacada. Elenco cirúrgico e letal com poder de fogo devastador nos jogos recentes."},
-    "Iraque": {"grupo": "I", "hist_ataque": 1.2, "hist_defesa": 1.5, "elim_ataque": 1.3, "elim_defesa": 1.3, "escanteios": 4.2, "cartoes": 2.2, "faltas": 14.5, "atuacao_comentario": "Conquistou a vaga com base em bolas paradas e uma defesa aguerrida de forte imagem interna."},
-    "Noruega": {"grupo": "I", "hist_ataque": 1.8, "hist_defesa": 1.2, "elim_ataque": 2.0, "elim_defesa": 1.0, "escanteios": 5.3, "cartoes": 1.9, "faltas": 12.0, "atuacao_comentario": "Ataque impulsionado por centroavante de elite mundial. Depende muito do ritmo de seus meias."},
-    "Senegal": {"grupo": "I", "hist_ataque": 1.6, "hist_defesa": 1.0, "elim_ataque": 1.7, "elim_defesa": 0.9, "escanteios": 5.0, "cartoes": 2.1, "faltas": 14.3, "atuacao_comentario": "Principal força africana em balanço tático. Robusto no meio, rápido nas pontas e zaga segura."},
-    # GRUPO J
-    "Argentina": {"grupo": "J", "hist_ataque": 2.4, "hist_defesa": 0.7, "elim_ataque": 2.5, "elim_defesa": 0.5, "escanteios": 6.2, "cartoes": 2.0, "faltas": 12.6, "atuacao_comentario": "Atual campeã com domínio total das Eliminatórias. Solidez defensiva espetacular e controle absoluto."},
-    "Argélia": {"grupo": "J", "hist_ataque": 1.5, "hist_defesa": 1.2, "elim_ataque": 1.6, "elim_defesa": 1.0, "escanteios": 4.9, "cartoes": 2.3, "faltas": 14.0, "atuacao_comentario": "Futebol muito técnico e intenso. Apresentou grande evolução na criação ofensiva recente."},
-    "Áustria": {"grupo": "J", "hist_ataque": 1.6, "hist_defesa": 1.1, "elim_ataque": 1.7, "elim_defesa": 1.0, "escanteios": 5.4, "cartoes": 2.1, "faltas": 13.5, "atuacao_comentario": "Estilo baseado em pressão alta agressiva constante, forçando erros na saída adversária."},
-    "Jordânia": {"grupo": "J", "hist_ataque": 1.0, "hist_defesa": 1.6, "elim_ataque": 1.2, "elim_defesa": 1.4, "escanteios": 3.8, "cartoes": 2.2, "faltas": 15.0, "atuacao_comentario": "Zebra asiática focada em fechar espaços centrais e abusar de faltas táticas no meio-campo."},
-    # GRUPO K
-    "Portugal": {"grupo": "K", "hist_ataque": 2.4, "hist_defesa": 0.8, "elim_ataque": 2.5, "elim_defesa": 0.7, "escanteios": 6.3, "cartoes": 1.9, "faltas": 11.4, "atuacao_comentario": "Campanha avassaladora na Europa com alto índice de posse criativa e finalizações por jogo."},
-    "RD do Congo": {"grupo": "K", "hist_ataque": 1.3, "hist_defesa": 1.3, "elim_ataque": 1.4, "elim_defesa": 1.1, "escanteios": 4.5, "cartoes": 2.4, "faltas": 15.5, "atuacao_comentario": "Estilo físico explosivo. Consegue incomodar defesas lentas, mas deixa espaços atrás."},
-    "Uzbequistão": {"grupo": "K", "hist_ataque": 1.2, "hist_defesa": 1.2, "elim_ataque": 1.4, "elim_defesa": 1.0, "escanteios": 4.4, "cartoes": 1.8, "faltas": 13.2, "atuacao_comentario": "Time em clara ascensão tática na Ásia, focado em forte disciplina posicional de linhas compactas."},
-    "Colômbia": {"grupo": "K", "hist_ataque": 1.8, "hist_defesa": 0.9, "elim_ataque": 2.0, "elim_defesa": 0.8, "escanteios": 5.4, "cartoes": 2.7, "faltas": 14.9, "atuacao_comentario": "Campanha sólida na CONMEBOL. Jogo físico intenso aliado a meias de altíssima capacidade criativa."},
-    # GRUPO L
-    "Inglaterra": {"grupo": "L", "hist_ataque": 2.3, "hist_defesa": 0.8, "elim_ataque": 2.4, "elim_defesa": 0.7, "escanteios": 6.6, "cartoes": 1.4, "faltas": 11.2, "atuacao_comentario": "Sufocante. Domínio amplo do seu grupo europeu com elenco de altíssimo valor de mercado e repertório."},
-    "Croácia": {"grupo": "L", "hist_ataque": 1.6, "hist_defesa": 1.0, "elim_ataque": 1.5, "elim_defesa": 0.9, "escanteios": 5.2, "cartoes": 1.8, "faltas": 12.1, "atuacao_comentario": "Meio-campo cerebral que controla o ritmo das partidas e dita a velocidade das ações de jogo."},
-    "Gana": {"grupo": "L", "hist_ataque": 1.4, "hist_defesa": 1.4, "elim_ataque": 1.5, "elim_defesa": 1.2, "escanteios": 4.7, "cartoes": 2.3, "faltas": 14.8, "atuacao_comentario": "Transição ofensiva de alta velocidade e explosão, mas vulnerável se pressionada na saída."},
-    "Panamá": {"grupo": "L", "hist_ataque": 1.1, "hist_defesa": 1.6, "elim_ataque": 1.4, "elim_defesa": 1.2, "escanteios": 4.0, "cartoes": 2.0, "faltas": 13.6, "atuacao_comentario": "Classificação muito madura na CONCACAF com forte base tática coletiva montada nos últimos anos."},
+    "México": {"grupo": "A", "hist_ataque": 1.8, "hist_defesa": 1.1, "elim_ataque": 1.6, "elim_defesa": 1.2, "escanteios": 5.4, "cartoes": 2.1, "faltas": 13.2},
+    "África do Sul": {"grupo": "A", "hist_ataque": 1.2, "hist_defesa": 1.3, "elim_ataque": 1.3, "elim_defesa": 1.1, "escanteios": 4.6, "cartoes": 1.9, "faltas": 14.5},
+    "Coreia do Sul": {"grupo": "A", "hist_ataque": 1.6, "hist_defesa": 1.0, "elim_ataque": 1.8, "elim_defesa": 0.9, "escanteios": 5.1, "cartoes": 1.5, "faltas": 11.2},
+    "Chéquia": {"grupo": "A", "hist_ataque": 1.5, "hist_defesa": 1.2, "elim_ataque": 1.4, "elim_defesa": 1.1, "escanteios": 4.9, "cartoes": 2.3, "faltas": 13.8},
+    "Canadá": {"grupo": "B", "hist_ataque": 1.5, "hist_defesa": 1.2, "elim_ataque": 1.7, "elim_defesa": 1.1, "escanteios": 5.2, "cartoes": 1.8, "faltas": 12.9},
+    "Bósnia e Herzegovina": {"grupo": "B", "hist_ataque": 1.3, "hist_defesa": 1.4, "elim_ataque": 1.2, "elim_defesa": 1.3, "escanteios": 4.7, "cartoes": 2.5, "faltas": 14.7},
+    "Catar": {"grupo": "B", "hist_ataque": 1.1, "hist_defesa": 1.6, "elim_ataque": 1.3, "elim_defesa": 1.5, "escanteios": 4.1, "cartoes": 2.0, "faltas": 12.1},
+    "Suíça": {"grupo": "B", "hist_ataque": 1.6, "hist_defesa": 1.0, "elim_ataque": 1.7, "elim_defesa": 0.9, "escanteios": 5.5, "cartoes": 1.7, "faltas": 12.5},
+    "Brasil": {"grupo": "C", "hist_ataque": 2.5, "hist_defesa": 0.6, "elim_ataque": 1.6, "elim_defesa": 1.1, "escanteios": 6.8, "cartoes": 1.6, "faltas": 13.2},
+    "Marrocos": {"grupo": "C", "hist_ataque": 1.9, "hist_defesa": 0.8, "elim_ataque": 2.2, "elim_defesa": 0.7, "escanteios": 5.6, "cartoes": 2.1, "faltas": 14.0},
+    "Haiti": {"grupo": "C", "hist_ataque": 0.8, "hist_defesa": 2.4, "elim_ataque": 1.0, "elim_defesa": 2.0, "escanteios": 3.5, "cartoes": 2.4, "faltas": 16.0},
+    "Escócia": {"grupo": "C", "hist_ataque": 1.3, "hist_defesa": 1.4, "elim_ataque": 1.4, "elim_defesa": 1.2, "escanteios": 4.8, "cartoes": 2.2, "faltas": 14.2},
+    "Estados Unidos": {"grupo": "D", "hist_ataque": 1.9, "hist_defesa": 1.0, "elim_ataque": 1.8, "elim_defesa": 0.9, "escanteios": 5.8, "cartoes": 1.9, "faltas": 12.2},
+    "Paraguai": {"grupo": "D", "hist_ataque": 1.1, "hist_defesa": 0.9, "elim_ataque": 1.0, "elim_defesa": 0.8, "escanteios": 4.5, "cartoes": 2.8, "faltas": 16.5},
+    "Austrália": {"grupo": "D", "hist_ataque": 1.4, "hist_defesa": 1.2, "elim_ataque": 1.3, "elim_defesa": 1.1, "escanteios": 5.0, "cartoes": 1.8, "faltas": 13.5},
+    "Turquia": {"grupo": "D", "hist_ataque": 1.7, "hist_defesa": 1.3, "elim_ataque": 1.8, "elim_defesa": 1.1, "escanteios": 5.3, "cartoes": 2.6, "faltas": 14.8},
+    "Alemanha": {"grupo": "E", "hist_ataque": 2.3, "hist_defesa": 0.9, "elim_ataque": 2.2, "elim_defesa": 0.9, "escanteios": 6.5, "cartoes": 1.8, "faltas": 11.9},
+    "Curaçao": {"grupo": "E", "hist_ataque": 0.7, "hist_defesa": 2.5, "elim_ataque": 0.9, "elim_defesa": 2.1, "escanteios": 3.4, "cartoes": 2.3, "faltas": 15.2},
+    "Costa do Marfim": {"grupo": "E", "hist_ataque": 1.6, "hist_defesa": 1.1, "elim_ataque": 1.8, "elim_defesa": 1.0, "escanteios": 5.2, "cartoes": 2.2, "faltas": 14.1},
+    "Equador": {"grupo": "E", "hist_ataque": 1.5, "hist_defesa": 1.0, "elim_ataque": 1.4, "elim_defesa": 0.8, "escanteios": 5.1, "cartoes": 2.4, "faltas": 15.0},
+    "Holanda": {"grupo": "F", "hist_ataque": 2.1, "hist_defesa": 0.9, "elim_ataque": 2.3, "elim_defesa": 0.8, "escanteios": 6.1, "cartoes": 1.7, "faltas": 12.4},
+    "Japão": {"grupo": "F", "hist_ataque": 1.8, "hist_defesa": 1.0, "elim_ataque": 2.1, "elim_defesa": 0.7, "escanteios": 5.5, "cartoes": 1.3, "faltas": 10.5},
+    "Suécia": {"grupo": "F", "hist_ataque": 1.6, "hist_defesa": 1.1, "elim_ataque": 1.5, "elim_defesa": 1.0, "escanteios": 5.4, "cartoes": 2.0, "faltas": 13.0},
+    "Tunísia": {"grupo": "F", "hist_ataque": 1.1, "hist_defesa": 1.3, "elim_ataque": 1.2, "elim_defesa": 1.1, "escanteios": 4.2, "cartoes": 2.2, "faltas": 14.9},
+    "Bélgica": {"grupo": "G", "hist_ataque": 2.0, "hist_defesa": 1.0, "elim_ataque": 1.9, "elim_defesa": 1.1, "escanteios": 5.9, "cartoes": 1.6, "faltas": 11.8},
+    "Egito": {"grupo": "G", "hist_ataque": 1.4, "hist_defesa": 1.1, "elim_ataque": 1.5, "elim_defesa": 1.0, "escanteios": 4.6, "cartoes": 2.1, "faltas": 13.4},
+    "Irã": {"grupo": "G", "hist_ataque": 1.3, "hist_defesa": 1.2, "elim_ataque": 1.4, "elim_defesa": 1.1, "escanteios": 4.4, "cartoes": 2.3, "faltas": 14.2},
+    "Nova Zelândia": {"grupo": "G", "hist_ataque": 1.0, "hist_defesa": 1.7, "elim_ataque": 1.2, "elim_defesa": 1.4, "escanteios": 3.9, "cartoes": 1.7, "faltas": 13.1},
+    "Espanha": {"grupo": "H", "hist_ataque": 2.3, "hist_defesa": 0.8, "elim_ataque": 2.4, "elim_defesa": 0.6, "escanteios": 6.7, "cartoes": 1.5, "faltas": 11.0},
+    "Cabo Verde": {"grupo": "H", "hist_ataque": 1.1, "hist_defesa": 1.5, "elim_ataque": 1.3, "elim_defesa": 1.3, "escanteios": 4.0, "cartoes": 2.1, "faltas": 14.6},
+    "Arábia Saudita": {"grupo": "H", "hist_ataque": 1.2, "hist_defesa": 1.4, "elim_ataque": 1.3, "elim_defesa": 1.2, "escanteios": 4.3, "cartoes": 2.4, "faltas": 13.9},
+    "Uruguai": {"grupo": "H", "hist_ataque": 1.9, "hist_defesa": 0.9, "elim_ataque": 2.1, "elim_defesa": 0.8, "escanteios": 5.6, "cartoes": 2.6, "faltas": 15.4},
+    "França": {"grupo": "I", "hist_ataque": 2.5, "hist_defesa": 0.8, "elim_ataque": 2.6, "elim_defesa": 0.6, "escanteios": 6.4, "cartoes": 1.5, "faltas": 11.5},
+    "Iraque": {"grupo": "I", "hist_ataque": 1.2, "hist_defesa": 1.5, "elim_ataque": 1.3, "elim_defesa": 1.3, "escanteios": 4.2, "cartoes": 2.2, "faltas": 14.5},
+    "Noruega": {"grupo": "I", "hist_ataque": 1.8, "hist_defesa": 1.2, "elim_ataque": 2.0, "elim_defesa": 1.0, "escanteios": 5.3, "cartoes": 1.9, "faltas": 12.0},
+    "Senegal": {"grupo": "I", "hist_ataque": 1.6, "hist_defesa": 1.0, "elim_ataque": 1.7, "elim_defesa": 0.9, "escanteios": 5.0, "cartoes": 2.1, "faltas": 14.3},
+    "Argentina": {"grupo": "J", "hist_ataque": 2.4, "hist_defesa": 0.7, "elim_ataque": 2.5, "elim_defesa": 0.5, "escanteios": 6.2, "cartoes": 2.0, "faltas": 12.6},
+    "Argélia": {"grupo": "J", "hist_ataque": 1.5, "hist_defesa": 1.2, "elim_ataque": 1.6, "elim_defesa": 1.0, "escanteios": 4.9, "cartoes": 2.3, "faltas": 14.0},
+    "Áustria": {"grupo": "J", "hist_ataque": 1.6, "hist_defesa": 1.1, "elim_ataque": 1.7, "elim_defesa": 1.0, "escanteios": 5.4, "cartoes": 2.1, "faltas": 13.5},
+    "Jordânia": {"grupo": "J", "hist_ataque": 1.0, "hist_defesa": 1.6, "elim_ataque": 1.2, "elim_defesa": 1.4, "escanteios": 3.8, "cartoes": 2.2, "faltas": 15.0},
+    "Portugal": {"grupo": "K", "hist_ataque": 2.4, "hist_defesa": 0.8, "elim_ataque": 2.5, "elim_defesa": 0.7, "escanteios": 6.3, "cartoes": 1.9, "faltas": 11.4},
+    "RD do Congo": {"grupo": "K", "hist_ataque": 1.3, "hist_defesa": 1.3, "elim_ataque": 1.4, "elim_defesa": 1.1, "escanteios": 4.5, "cartoes": 2.4, "faltas": 15.5},
+    "Uzbequistão": {"grupo": "K", "hist_ataque": 1.2, "hist_defesa": 1.2, "elim_ataque": 1.4, "elim_defesa": 1.0, "escanteios": 4.4, "cartoes": 1.8, "faltas": 13.2},
+    "Colômbia": {"grupo": "K", "hist_ataque": 1.8, "hist_defesa": 0.9, "elim_ataque": 2.0, "elim_defesa": 0.8, "escanteios": 5.4, "cartoes": 2.7, "faltas": 14.9},
+    "Inglaterra": {"grupo": "L", "hist_ataque": 2.3, "hist_defesa": 0.8, "elim_ataque": 2.4, "elim_defesa": 0.7, "escanteios": 6.6, "cartoes": 1.4, "faltas": 11.2},
+    "Croácia": {"grupo": "L", "hist_ataque": 1.6, "hist_defesa": 1.0, "elim_ataque": 1.5, "elim_defesa": 0.9, "escanteios": 5.2, "cartoes": 1.8, "faltas": 12.1},
+    "Gana": {"grupo": "L", "hist_ataque": 1.4, "hist_defesa": 1.4, "elim_ataque": 1.5, "elim_defesa": 1.2, "escanteios": 4.7, "cartoes": 2.3, "faltas": 14.8},
+    "Panamá": {"grupo": "L", "hist_ataque": 1.1, "hist_defesa": 1.6, "elim_ataque": 1.4, "elim_defesa": 1.2, "escanteios": 4.0, "cartoes": 2.0, "faltas": 13.6},
 }
 
-
 # ==============================================================================
-# 3. MOTOR MATEMÁTICO QUANTITATIVO DE POISSON
+# MOTOR MATEMÁTICO DE POISSON
 # ==============================================================================
 def calcular_poisson(lambda_gols, k):
-    if lambda_gols <= 0:
-        return 0.0
+    if lambda_gols <= 0: return 0.0
     return (math.exp(-lambda_gols) * (lambda_gols**k)) / math.factorial(k)
 
+# ==============================================================================
+# SISTEMA DE CÁLCULO DE PONTOS DO BOLÃO
+# ==============================================================================
+def computar_pontos_bolao(gols_m_prev, gols_v_prev, gols_m_real, gols_v_real, eh_mata_mata=False):
+    # Identificar vencedores primários das duas vertentes
+    vencedor_prev = "M" if gols_m_prev > gols_v_prev else ("V" if gols_v_prev > gols_m_prev else "E")
+    vencedor_real = "M" if gols_m_real > gols_v_real else ("V" if gols_v_real > gols_m_real else "E")
+    
+    saldo_prev = gols_m_prev - gols_v_prev
+    saldo_real = gols_m_real - gols_v_real
 
-def realizar_analise_completa(m_time, v_time, banco_dados, media_gols_base, eh_copa=False):
+    gols_vencedor_prev = max(gols_m_prev, gols_v_prev) if vencedor_prev != "E" else gols_m_prev
+    gols_vencedor_real = max(gols_m_real, gols_v_real) if vencedor_real != "E" else gols_m_real
+    
+    gols_perdedor_prev = min(gols_m_prev, gols_v_prev) if vencedor_prev != "E" else gols_m_prev
+    gols_perdedor_real = min(gols_m_real, gols_v_real) if vencedor_real != "E" else gols_m_real
+
+    pontos = 0
+    # Regra 1: Placar Exato
+    if gols_m_prev == gols_m_real and gols_v_prev == gols_v_real:
+        pontos = 25
+    # Regra 2: Vencedor e Gols do Vencedor
+    elif vencedor_prev == vencedor_real and gols_vencedor_prev == gols_vencedor_real and vencedor_real != "E":
+        pontos = 18
+    # Regra 3: Vencedor e Diferença de Gols
+    elif vencedor_prev == vencedor_real and saldo_prev == saldo_real:
+        pontos = 15
+    # Regra 4: Gols do Perdedor (Acertou mesmo errando o resto)
+    elif gols_perdedor_prev == gols_perdedor_real and vencedor_real != "E":
+        pontos = 12
+    # Regra 5: Somente o Vencedor Seco
+    elif vencedor_prev == vencedor_real:
+        pontos = 10
+    else:
+        pontos = 0
+
+    if eh_mata_mata:
+        pontos *= 2
+        
+    return pontos
+
+def realizar_analise_completa(m_time, v_time, banco_dados, media_gols_base, eh_copa=False, 
+                              contexto_m=1.0, contexto_v=1.0, forma_m=1.0, forma_v=1.0):
     t_m = banco_dados[m_time]
     t_v = banco_dados[v_time]
 
-    # CÁLCULO DOS LAMBDAS (Gols Esperados por Equipe)
     if not eh_copa:
         lambda_m = (t_m["ataque"] * FATOR_CASA_ATAQUE) * (t_v["defesa"] / media_gols_base) * t_m["forma"]
         lambda_v = (t_v["ataque"] * (t_m["defesa"] * FATOR_CASA_DEFESA) / media_gols_base) * t_v["forma"]
         base_ataque_m, base_ataque_v = t_m["ataque"], t_v["ataque"]
     else:
-        ataque_ponderado_m = (t_m["hist_ataque"] * 0.3) + (t_m["elim_ataque"] * 0.7)
-        defesa_ponderado_m = (t_m["hist_defesa"] * 0.3) + (t_m["elim_defesa"] * 0.7)
-        ataque_ponderado_v = (t_v["hist_ataque"] * 0.3) + (t_v["elim_ataque"] * 0.7)
-        defesa_ponderado_v = (t_v["hist_defesa"] * 0.3) + (t_v["elim_defesa"] * 0.7)
+        ataque_m = ((t_m["hist_ataque"] * 0.3) + (t_m["elim_ataque"] * 0.7)) * contexto_m * forma_m
+        defesa_m = ((t_m["hist_defesa"] * 0.3) + (t_m["elim_defesa"] * 0.7)) / forma_m
         
-        lambda_m = ataque_ponderado_m * (defesa_ponderado_v / media_gols_base)
-        lambda_v = ataque_ponderado_v * (defesa_ponderado_m / media_gols_base)
-        base_ataque_m, base_ataque_v = ataque_ponderado_m, ataque_ponderado_v
+        ataque_v = ((t_v["hist_ataque"] * 0.3) + (t_v["elim_ataque"] * 0.7)) * contexto_v * forma_v
+        defesa_v = ((t_v["hist_defesa"] * 0.3) + (t_v["elim_defesa"] * 0.7)) / forma_v
+        
+        lambda_m = ataque_m * (defesa_v / media_gols_base)
+        lambda_v = ataque_v * (defesa_m / media_gols_base)
+        base_ataque_m, base_ataque_v = ataque_m, ataque_v
 
-    # Matriz bidimensional de probabilidades de placar (0 a 6 gols)
     max_gols = 6
     matriz_gols = pd.DataFrame(0.0, index=range(max_gols), columns=range(max_gols))
     prob_m, prob_v, prob_empate = 0.0, 0.0, 0.0
-    
-    # Variáveis dos novos mercados adicionados
     prob_btts_sim = 0.0
-    prob_over_05 = 0.0
-    prob_over_15 = 0.0
-    prob_over_25 = 0.0
-    prob_over_35 = 0.0
+    prob_over_15 = prob_over_25 = 0.0
 
     for g_m, g_v in itertools.product(range(max_gols), range(max_gols)):
-        p_m = calcular_poisson(lambda_m, g_m)
-        p_v = calcular_poisson(lambda_v, g_v)
-        p_combinada = p_m * p_v
+        p_combinada = calcular_poisson(lambda_m, g_m) * calcular_poisson(lambda_v, g_v)
         matriz_gols.at[g_m, g_v] = p_combinada
 
-        # 1X2 Probabilidades bases
-        if g_m > g_v:
-            prob_m += p_combinada
-        elif g_v > g_m:
-            prob_v += p_combinada
-        else:
-            prob_empate += p_combinada
+        if g_m > g_v: prob_m += p_combinada
+        elif g_v > g_m: prob_v += p_combinada
+        else: prob_empate += p_combinada
 
-        # Novo Mercado: Ambas Marcam (BTTS)
-        if g_m > 0 and g_v > 0:
-            prob_btts_sim += p_combinada
+        if g_m > 0 and g_v > 0: prob_btts_sim += p_combinada
+        if g_m + g_v > 1.5: prob_over_15 += p_combinada
+        if g_m + g_v > 2.5: prob_over_25 += p_combinada
 
-        # Novo Mercado: Linhas de Gols Totais (Over)
-        total_gols = g_m + g_v
-        if total_gols > 0.5: prob_over_05 += p_combinada
-        if total_gols > 1.5: prob_over_15 += p_combinada
-        if total_gols > 2.5: prob_over_25 += p_combinada
-        if total_gols > 3.5: prob_over_35 += p_combinada
-
-    # Identificar a Moda da Distribuição
     placar_index = matriz_gols.stack().idxmax()
     prob_placar_moda = matriz_gols.at[placar_index[0], placar_index[1]]
 
-    # Conversão para Fair Odds Decimais (1X2)
-    odd_m = round(1 / prob_m, 2) if prob_m > 0 else 99.0
-    odd_empate = round(1 / prob_empate, 2) if prob_empate > 0 else 99.0
-    odd_v = round(1 / prob_v, 2) if prob_v > 0 else 99.0
-
-    # Novo Mercado: Chance Dupla (Double Chance)
-    prob_1x = prob_m + prob_empate
-    prob_x2 = prob_v + prob_empate
-    prob_12 = prob_m + prob_v
-    
-    odd_1x = round(1 / prob_1x, 2) if prob_1x > 0 else 99.0
-    odd_x2 = round(1 / prob_x2, 2) if prob_x2 > 0 else 99.0
-    odd_12 = round(1 / prob_12, 2) if prob_12 > 0 else 99.0
-
-    # Projeção de Scouts baseados no Ritmo de Jogo gerado pelos xG
-    fator_ritmo = (lambda_m + lambda_v) / (base_ataque_m + base_ataque_v)
-    escanteios_proj = (t_m["escanteios"] + t_v["escanteios"]) * fator_ritmo
-    cartoes_proj = t_m["cartoes"] + t_v["cartoes"]
-    faltas_proj = (t_m["faltas"] + t_v["faltas"]) * (fator_ritmo * 0.95)
-
     return {
         "prob_m": prob_m, "prob_empate": prob_empate, "prob_v": prob_v,
-        "odd_m": odd_m, "odd_empate": odd_empate, "odd_v": odd_v,
-        "placar_moda": f"{placar_index[0]} x {placar_index[1]}",
-        "prob_placar": prob_placar_moda,
-        "matriz": matriz_gols,
-        "escanteios": round(escanteios_proj, 1),
-        "cartoes": round(cartoes_proj, 1),
-        "faltas": round(faltas_proj, 1),
-        "gols_esperados_m": round(lambda_m, 2),
-        "gols_esperados_v": round(lambda_v, 2),
-        # Dados Novos Compilados
+        "placar_moda_m": placar_index[0], "placar_moda_v": placar_index[1],
+        "placar_moda_str": f"{placar_index[0]} x {placar_index[1]}", "prob_placar": prob_placar_moda,
+        "matriz": matriz_gols, "escanteios": round((t_m["escanteios"] + t_v["escanteios"]), 1),
+        "cartoes": round(t_m["cartoes"] + t_v["cartoes"], 1), "faltas": round((t_m["faltas"] + t_v["faltas"]), 1),
+        "gols_esperados_m": round(lambda_m, 2), "gols_esperados_v": round(lambda_v, 2),
         "btts_sim": prob_btts_sim, "btts_nao": 1.0 - prob_btts_sim,
-        "over_05": prob_over_05, "over_15": prob_over_15, "over_25": prob_over_25, "over_35": prob_over_35,
-        "prob_1x": prob_1x, "prob_x2": prob_x2, "prob_12": prob_12,
-        "odd_1x": odd_1x, "odd_x2": odd_x2, "odd_12": odd_12
+        "over_15": prob_over_15, "over_25": prob_over_25
     }
 
-
 # ==============================================================================
-# 4. INTERFACE GRÁFICA INTERATIVA (STREAMLIT DASHBOARD)
+# INTERFACE GRÁFICA INTERATIVA (STREAMLIT DASHBOARD)
 # ==============================================================================
-st.title("📊 Plataforma de Inteligência Preditiva & Fair Odds")
-st.markdown("Análise quantitativa com Cadeias de Poisson, Ajuste de Mando, Linhas de Gols (Over/Under) e Ambas Marcam.")
+st.title("📊 Preditor Quantitativo Pro - Especial Bolão Copa 2026")
 
-tab_br, tab_copa = st.tabs(["🇧🇷 Campeonato Brasileiro (Série A)", "🌍 Copa do Mundo 2026"])
+tab_br, tab_copa, tab_auditoria = st.tabs(["🇧🇷 Campeonato Brasileiro", "🌍 Copa do Mundo 2026", "🏆 Histórico & Auditoria do Bolão"])
 
-# --- CONFIGURAÇÃO DA ABA BRASILEIRÃO ---
 with tab_br:
     col1, col2 = st.columns(2)
-    with col1:
-        time_m = st.selectbox("Mandante (Casa)", sorted(list(DADOS_BRASILEIRAO.keys())), index=sorted(list(DADOS_BRASILEIRAO.keys())).index("Palmeiras"))
-    with col2:
-        time_v = st.selectbox("Visitante (Fora)", sorted(list(DADOS_BRASILEIRAO.keys())), index=sorted(list(DADOS_BRASILEIRAO.keys())).index("Flamengo"))
-
-    if time_m == time_v:
-        st.warning("Selecione equipes diferentes para o confronto do Brasileirão.")
-    else:
-        res = realizar_analise_completa(time_m, time_v, DADOS_BRASILEIRAO, MEDIA_GOLS_SÉRIE_A, eh_copa=False)
-        
-        # Grid Principal de Resultados
+    with col1: time_m = st.selectbox("Mandante (Casa)", sorted(list(DADOS_BRASILEIRAO.keys())), index=0)
+    with col2: time_v = st.selectbox("Visitante (Fora)", sorted(list(DADOS_BRASILEIRAO.keys())), index=1)
+    
+    if time_m != time_v:
+        res = realizar_analise_completa(time_m, time_v, DADOS_BRASILEIRAO, MEDIA_GOLS_SÉRIE_A)
         c_mod, c_xg1, c_xg2 = st.columns(3)
-        c_mod.metric("Placar Isolado Mais Provável", res["placar_moda"], f"{round(res['prob_placar']*100, 1)}% de chance")
-        c_xg1.metric(f"Gols Esperados (xG) - {time_m}", res["gols_esperados_m"])
-        c_xg2.metric(f"Gols Esperados (xG) - {time_v}", res["gols_esperados_v"])
+        c_mod.metric("Placar Mais Provável", res["placar_moda_str"], f"{round(res['prob_placar']*100, 1)}% de chance")
+        c_xg1.metric(f"xG - {time_m}", res["gols_esperados_m"])
+        c_xg2.metric(f"xG - {time_v}", res["gols_esperados_v"])
 
-        # Layout em colunas para os blocos de mercado
-        st.markdown("### 🎲 Precificação de Mercados Primários (1X2 & Chance Dupla)")
-        col_m1, col_m2 = st.columns(2)
-        
-        with col_m1:
-            st.caption("**Mercado 1X2 Principal**")
-            st.markdown(f"**Vitoria {time_m}:** {round(res['prob_m']*100, 1)}% | **Odd:** @{res['odd_m']}")
-            st.markdown(f"**Empate:** {round(res['prob_empate']*100, 1)}% | **Odd:** @{res['odd_empate']}")
-            st.markdown(f"**Vitoria {time_v}:** {round(res['prob_v']*100, 1)}% | **Odd:** @{res['odd_v']}")
-            
-        with col_m2:
-            st.caption("**Mercado de Chance Dupla**")
-            st.markdown(f"**Mandante ou Empate (1X):** {round(res['prob_1x']*100, 1)}% | **Odd:** @{res['odd_1x']}")
-            st.markdown(f"**Visitante ou Empate (X2):** {round(res['prob_x2']*100, 1)}% | **Odd:** @{res['odd_x2']}")
-            st.markdown(f"**Qualquer Time Vence (12):** {round(res['prob_12']*100, 1)}% | **Odd:** @{res['odd_12']}")
-
-        # Novos Blocos: Gols e Ambas Marcam lado a lado
-        st.markdown("### ⚽ Mercados de Gols & Ambas Marcam (BTTS)")
-        col_g1, col_g2 = st.columns(2)
-        
-        with col_g1:
-            st.caption("**Probabilidade Over Gols**")
-            st.markdown(f"**Mais de 0.5 Gols:** {round(res['over_05']*100, 1)}% | **Odd Justa:** @{round(1/res['over_05'], 2)}")
-            st.markdown(f"**Mais de 1.5 Gols:** {round(res['over_15']*100, 1)}% | **Odd Justa:** @{round(1/res['over_15'], 2)}")
-            st.markdown(f"**Mais de 2.5 Gols:** {round(res['over_25']*100, 1)}% | **Odd Justa:** @{round(1/res['over_25'], 2)}")
-            st.markdown(f"**Mais de 3.5 Gols:** {round(res['over_35']*100, 1)}% | **Odd Justa:** @{round(1/res['over_35'], 2)}")
-            
-        with col_g2:
-            st.caption("**Ambas as Equipes Marcam**")
-            st.markdown(f"**SIM:** {round(res['btts_sim']*100, 1)}% | **Odd Justa:** @{round(1/res['btts_sim'], 2)}")
-            st.markdown(f"**NÃO:** {round(res['btts_nao']*100, 1)}% | **Odd Justa:** @{round(1/res['btts_nao'], 2)}")
-
-        # Redução da Matriz dentro de um Menu Expansível Retrátil
-        with st.expander("🗺️ Ver Matriz Colorida de Probabilidade de Gols (Opcional)"):
-            fig, ax = plt.subplots(figsize=(4.5, 2.2))  # Tamanho reduzido
-            sns.heatmap(res["matriz"], annot=True, fmt=".1%", cmap="YlGnBu", xticklabels=range(6), yticklabels=range(6), ax=ax, annot_kws={"size": 6})
-            ax.tick_params(labelsize=6)
-            plt.xlabel(f"Gols do Visitante ({time_v})", fontsize=6)
-            plt.ylabel(f"Gols do Mandante ({time_m})", fontsize=6)
-            st.pyplot(fig)
-
-        st.markdown("### 📈 Projeção Estatística de Disciplina e Cantos")
-        st.table({
-            "Mercado de Estatísticas": ["Linha de Escanteios Totais", "Linha de Cartões Amarelos Totais", "Linha de Faltas Totais Cometidas"],
-            "Projeção do Modelo Quant": [res["escanteios"], res["cartoes"], res["faltas"]]
-        })
-
-# --- CONFIGURAÇÃO DA ABA COPA DO MUNDO ---
 with tab_copa:
-    col1, col2 = st.columns(2)
-    with col1:
-        lista_completa_copa = sorted(list(DADOS_COPA_PONDERADO.keys()))
-        selec_m = st.selectbox("Seleção Mandante", lista_completa_copa, index=lista_completa_copa.index("Brasil"))
-    with col2:
-        selec_v = st.selectbox("Seleção Visitante", lista_completa_copa, index=lista_completa_copa.index("Panamá"))
+    st.sidebar.header("⚙️ Central de Contexto Operacional")
+    status_m = st.sidebar.selectbox("Contexto Seleção A", ["Foco Total / Decisivo", "Rodada 3 - Poupando / Classificado", "Amistoso / Testes"], index=0)
+    status_v = st.sidebar.selectbox("Contexto Seleção B", ["Foco Total / Decisivo", "Rodada 3 - Poupando / Classificado", "Amistoso / Testes"], index=0)
+    
+    f_mot_m = 0.75 if status_m == "Rodada 3 - Poupando / Classificado" else (0.90 if status_m == "Amistoso / Testes" else 1.0)
+    f_mot_v = 0.75 if status_v == "Rodada 3 - Poupando / Classificado" else (0.90 if status_v == "Amistoso / Testes" else 1.0)
 
-    if selec_m == selec_v:
-        st.warning("Selecione seleções diferentes para o confronto da Copa.")
-    else:
-        res_c = realizar_analise_completa(selec_m, selec_v, DADOS_COPA_PONDERADO, MEDIA_GOLS_FIFA, eh_copa=True)
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("🔥 Desempenho Recente em Campo")
+    forma_m = st.sidebar.slider("Forma na Copa: Seleção A", 0.6, 1.4, 1.0, 0.05)
+    forma_v = st.sidebar.slider("Forma na Copa: Seleção B", 0.6, 1.4, 1.0, 0.05)
+    
+    fase_mata_mata = st.sidebar.checkbox("Jogo do Mata-Mata? (Pontos Dobrados)")
+
+    lista_completa_copa = sorted(list(DADOS_COPA_PONDERADO.keys()))
+    col_c1, col_c2 = st.columns(2)
+    with col_c1: selec_m = st.selectbox("Seleção A", lista_completa_copa, index=lista_completa_copa.index("Brasil"))
+    with col_c2: selec_v = st.selectbox("Seleção B", lista_completa_copa, index=lista_completa_copa.index("Marrocos"))
+
+    if selec_m != selec_v:
+        res_c = realizar_analise_completa(selec_m, selec_v, DADOS_COPA_PONDERADO, MEDIA_GOLS_FIFA, eh_copa=True,
+                                          contexto_m=f_mot_m, contexto_v=f_mot_v, forma_m=forma_m, forma_v=forma_v)
         
-        st.markdown("### 📝 Relatório de Atuação Recente (Peso de 70% nas Eliminatórias)")
-        col_rep1, col_rep2 = st.columns(2)
-        with col_rep1: st.info(f"**{selec_m}:** {DADOS_COPA_PONDERADO[selec_m]['atuacao_comentario']}")
-        with col_rep2: st.info(f"**{selec_v}:** {DADOS_COPA_PONDERADO[selec_v]['atuacao_comentario']}")
-            
         cm_mod, cm_xg1, cm_xg2 = st.columns(3)
-        cm_mod.metric("Placar Isolado Mais Provável", res_c["placar_moda"], f"{round(res_c['prob_placar']*100, 1)}% de chance")
-        cm_xg1.metric(f"xG Ponderado - {selec_m}", res_c["gols_esperados_m"])
-        cm_xg2.metric(f"xG Ponderado - {selec_v}", res_c["gols_esperados_v"])
+        cm_mod.metric("Placar Sugerido pelo Modelo", res_c["placar_moda_str"], f"{round(res_c['prob_placar']*100, 1)}% de confiança")
+        cm_xg1.metric(f"xG Ajustado - {selec_m}", res_c["gols_esperados_m"])
+        cm_xg2.metric(f"xG Ajustado - {selec_v}", res_c["gols_esperados_v"])
 
-        st.markdown("### 🎲 Precificação de Mercados Primários (Copa do Mundo)")
-        col_cm1, col_cm2 = st.columns(2)
-        with col_cm1:
-            st.caption("**Mercado 1X2 Principal**")
-            st.markdown(f"**Vitoria {selec_m}:** {round(res_c['prob_m']*100, 1)}% | **Odd:** @{res_c['odd_m']}")
-            st.markdown(f"**Empate:** {round(res_c['prob_empate']*100, 1)}% | **Odd:** @{res_c['odd_empate']}")
-            st.markdown(f"**Vitoria {selec_v}:** {round(res_c['prob_v']*100, 1)}% | **Odd:** @{res_c['odd_v']}")
-        with col_cm2:
-            st.caption("**Mercado de Chance Dupla**")
-            st.markdown(f"**Mandante ou Empate (1X):** {round(res_c['prob_1x']*100, 1)}% | **Odd:** @{res_c['odd_1x']}")
-            st.markdown(f"**Visitante ou Empate (X2):** {round(res_c['prob_x2']*100, 1)}% | **Odd:** @{res_c['odd_x2']}")
-            st.markdown(f"**Qualquer Time Vence (12):** {round(res_c['prob_12']*100, 1)}% | **Odd:** @{res_c['odd_12']}")
-
-        st.markdown("### ⚽ Mercados de Gols & Ambas Marcam (Copa do Mundo)")
+        st.markdown("### ⚽ Probabilidades de Linhas de Gols")
         col_cg1, col_cg2 = st.columns(2)
         with col_cg1:
-            st.caption("**Probabilidade Over Gols**")
-            st.markdown(f"**Mais de 0.5 Gols:** {round(res_c['over_05']*100, 1)}% | **Odd Justa:** @{round(1/res_c['over_05'], 2)}")
-            st.markdown(f"**Mais de 1.5 Gols:** {round(res_c['over_15']*100, 1)}% | **Odd Justa:** @{round(1/res_c['over_15'], 2)}")
-            st.markdown(f"**Mais de 2.5 Gols:** {round(res_c['over_25']*100, 1)}% | **Odd Justa:** @{round(1/res_c['over_25'], 2)}")
-            st.markdown(f"**Mais de 3.5 Gols:** {round(res_c['over_35']*100, 1)}% | **Odd Justa:** @{round(1/res_c['over_35'], 2)}")
+            st.markdown(f"**Mais de 1.5 Gols:** {round(res_c['over_15']*100, 1)}%")
+            st.markdown(f"**Mais de 2.5 Gols:** {round(res_c['over_25']*100, 1)}%")
         with col_cg2:
-            st.caption("**Ambas as Equipes Marcam**")
-            st.markdown(f"**SIM:** {round(res_c['btts_sim']*100, 1)}% | **Odd Justa:** @{round(1/res_c['btts_sim'], 2)}")
-            st.markdown(f"**NÃO:** {round(res_c['btts_nao']*100, 1)}% | **Odd Justa:** @{round(1/res_c['btts_nao'], 2)}")
+            st.markdown(f"**Ambas Marcam - SIM:** {round(res_c['btts_sim']*100, 1)}%")
+            st.markdown(f"**Ambas Marcam - NÃO:** {round(res_c['btts_nao']*100, 1)}%")
 
-        # Redução da Matriz na aba Copa
-        with st.expander("🗺️ Ver Matriz Colorida de Probabilidade de Gols (Opcional)"):
+        with st.expander("🗺️ Ver Matriz Colorida de Probabilidades"):
             fig_c, ax_c = plt.subplots(figsize=(4.5, 2.2))
             sns.heatmap(res_c["matriz"], annot=True, fmt=".1%", cmap="Oranges", xticklabels=range(6), yticklabels=range(6), ax=ax_c, annot_kws={"size": 6})
-            ax_c.tick_params(labelsize=6)
-            plt.xlabel(f"Gols de {selec_v}", fontsize=6)
-            plt.ylabel(f"Gols de {selec_m}", fontsize=6)
             st.pyplot(fig_c)
+
+# ==============================================================================
+# NOVA ABA: HISTÓRICO & AUDITORIA DE PERFORMANCE
+# ==============================================================================
+with tab_auditoria:
+    st.header("🏆 Auditoria de Performance Real do Modelo")
+    st.markdown("Insira aqui os placares oficiais dos jogos da Copa assim que eles terminarem. O aplicativo irá confrontá-los com a **sugestão matemática do App** para calcular quantos pontos você acumulou.")
+
+    with st.form("inserir_resultado_real"):
+        st.subheader("📝 Registrar Placar Encerrado")
+        c_aud1, c_aud2 = st.columns(2)
+        with c_aud1:
+            aud_m = st.selectbox("Seleção A (Casa)", lista_completa_copa, key="aud_m")
+            gols_real_m = st.number_input(f"Gols Reais de {aud_m}", min_value=0, max_value=15, step=1, value=0)
+        with c_aud2:
+            aud_v = st.selectbox("Seleção B (Fora)", lista_completa_copa, key="aud_v")
+            gols_real_v = st.number_input(f"Gols Reais de {aud_v}", min_value=0, max_value=15, step=1, value=0)
+            
+        c_check1, c_check2 = st.columns(2)
+        with c_check1:
+            aud_mata_mata = st.checkbox("Esta partida foi do Mata-Mata? (Dobra a Pontuação)")
+        with c_check2:
+            # Inputs manuais das condições do dia em que o palpite foi feito
+            aud_status_m = st.selectbox("Contexto usado na A", ["Foco Total / Decisivo", "Rodada 3 - Poupando / Classificado", "Amistoso / Testes"], key="aud_st_m")
+            aud_status_v = st.selectbox("Contexto usado na B", ["Foco Total / Decisivo", "Rodada 3 - Poupando / Classificado", "Amistoso / Testes"], key="aud_st_v")
+            aud_forma_m = st.slider("Forma usada na A", 0.6, 1.4, 1.0, 0.05, key="aud_f_m")
+            aud_forma_v = st.slider("Forma usada na B", 0.6, 1.4, 1.0, 0.05, key="aud_f_v")
+
+        enviar_dados = st.form_submit_button("💥 Computar Resultado e Atualizar Tabela")
+
+        if enviar_dados:
+            if aud_m == aud_v:
+                st.error("Erro: Selecione equipes diferentes para computar o jogo.")
+            else:
+                # Recupera o palpite exato que o app gerou sob aquelas condições
+                f_ctx_m = 0.75 if aud_status_m == "Rodada 3 - Poupando / Classificado" else (0.90 if aud_status_m == "Amistoso / Testes" else 1.0)
+                f_ctx_v = 0.75 if aud_status_v == "Rodada 3 - Poupando / Classificado" else (0.90 if aud_status_v == "Amistoso / Testes" else 1.0)
+                
+                analise_retroativa = realizar_analise_completa(aud_m, aud_v, DADOS_COPA_PONDERADO, MEDIA_GOLS_FIFA, eh_copa=True,
+                                                              contexto_m=f_ctx_m, contexto_v=f_ctx_v, forma_m=aud_forma_m, forma_v=aud_forma_v)
+                
+                g_m_sugerido = analise_retroativa["placar_moda_m"]
+                g_v_sugerido = analise_retroativa["placar_moda_v"]
+                
+                # Executa o algoritmo de regras do seu Bolão
+                pontos_obtidos = computar_pontos_bolao(g_m_sugerido, g_v_sugerido, gols_real_m, gols_real_v, eh_mata_mata=aud_mata_mata)
+                
+                # Salva o registro completo na memória
+                st.session_state.historico_bolao.append({
+                    "Partida": f"{aud_m} x {aud_v}",
+                    "Tipo": "Mata-Mata" if aud_mata_mata else "Fase de Grupos",
+                    "Sugestão do App": analise_retroativa["placar_moda_str"],
+                    "Resultado Real": f"{gols_real_m} x {gols_real_v}",
+                    "Pontos Conquistados": pontos_obtidos
+                })
+                st.success("Resultado adicionado com sucesso!")
+
+    # Exibição do Painel Geral de Desempenho
+    st.markdown("---")
+    st.subheader("🏆 Balanço Geral Acumulado")
+    
+    if len(st.session_state.historico_bolao) > 0:
+        df_historico = pd.DataFrame(st.session_state.historico_bolao)
+        total_pontos = df_historico["Pontos Conquistados"].sum()
         
-        st.markdown("### 📈 Projeção de Scouts")
-        st.table({
-            "Mercado de Estatísticas": ["Linha de Escanteios Totais", "Linha de Cartões Amarelos Totais", "Linha de Faltas Totais Cometidas"],
-            "Projeção do Modelo Quant": [res_c["escanteios"], res_c["cartoes"], res_c["faltas"]]
-        })
+        col_p1, col_p2 = st.columns(2)
+        col_p1.metric("Total de Pontos Conquistados com o App", f"{total_pontos} pts")
+        col_p2.metric("Jogos Analisados", f"{len(df_historico)} partidas")
+        
+        st.markdown("#### Detalhamento Rodada a Rodada")
+        st.dataframe(df_historico, use_container_width=True)
+        
+        if st.button("🧹 Resetar Histórico (Limpar Dados)"):
+            st.session_state.historico_bolao = []
+            st.rerun()
+    else:
+        st.info("Nenhum jogo registrado ainda. Insira os resultados acima conforme as partidas forem acontecendo na Copa real!")
