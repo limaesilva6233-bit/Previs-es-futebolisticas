@@ -257,17 +257,14 @@ with tab_auditoria:
         colunas_obrigatorias = ['Selecao_A', 'Selecao_B', 'Gols_A', 'Gols_B', 'Mata_Mata']
         
         if all(col in df_sheets.columns for col in colunas_obrigatorias):
-            # Filtra apenas linhas onde os gols foram preenchidos (jogos encerrados)
             df_encerrados = df_sheets.dropna(subset=['Gols_A', 'Gols_B']).copy()
             
-            # Garante tipo numérico para evitar bugs matemáticos
             df_encerrados['Gols_A'] = pd.to_numeric(df_encerrados['Gols_A'], errors='coerce')
             df_encerrados['Gols_B'] = pd.to_numeric(df_encerrados['Gols_B'], errors='coerce')
             df_encerrados = df_encerrados.dropna(subset=['Gols_A', 'Gols_B'])
 
             historico_calculado = []
             
-            # O processamento roda silenciosamente aqui (NENHUM componente visual st. é criado aqui dentro)
             for _, linha in df_encerrados.iterrows():
                 time_a = str(linha['Selecao_A']).strip()
                 time_v = str(linha['Selecao_B']).strip()
@@ -280,13 +277,14 @@ with tab_auditoria:
                     
                     g_a_sugerido = analise_retroativa["placar_moda_m"]
                     g_v_sugerido = analise_retroativa["placar_moda_v"]
+                    placar_sugerido_texto = analise_retroativa["placar_moda_str"]
                     
                     pontos = computar_pontos_bolao(g_a_sugerido, g_v_sugerido, gols_a_real, gols_b_real, eh_mata_mata=eh_mata)
                     
                     historico_calculado.append({
                         "Partida": f"{time_a} x {time_v}",
                         "Tipo": "Mata-Mata" if eh_mata else "Fase de Grupos",
-                        "Sugestão do App": anonymity_fix := analise_retroativa["placar_moda_str"],
+                        "Sugestão do App": placar_sugerido_texto,
                         "Placar Real Oficial": f"{gols_a_real} x {gols_b_real}",
                         "Pontos Obtidos": pontos
                     })
@@ -295,7 +293,6 @@ with tab_auditoria:
                 df_final = pd.DataFrame(historico_calculado)
                 total_pontos = df_final["Pontos Obtidos"].sum()
                 
-                # Exibição limpa dos resultados consolidados
                 c_m1, c_m2 = st.columns(2)
                 c_m1.metric("🎯 Total Acumulado pelo App", f"{total_pontos} pts")
                 c_m2.metric("🏁 Jogos Encerrados Processados", f"{len(df_final)} partidas")
