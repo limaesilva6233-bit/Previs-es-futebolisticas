@@ -110,7 +110,6 @@ def calcular_poisson(lambda_gols, k):
 # SISTEMA DE CÁLCULO DE PONTOS DO BOLÃO
 # ==============================================================================
 def computar_pontos_bolao(gols_m_prev, gols_v_prev, gols_m_real, gols_v_real, eh_mata_mata=False):
-    # Identificar vencedores primários das duas vertentes
     vencedor_prev = "M" if gols_m_prev > gols_v_prev else ("V" if gols_v_prev > gols_m_prev else "E")
     vencedor_real = "M" if gols_m_real > gols_v_real else ("V" if gols_v_real > gols_m_real else "E")
     
@@ -124,19 +123,14 @@ def computar_pontos_bolao(gols_m_prev, gols_v_prev, gols_m_real, gols_v_real, eh
     gols_perdedor_real = min(gols_m_real, gols_v_real) if vencedor_real != "E" else gols_m_real
 
     pontos = 0
-    # Regra 1: Placar Exato
     if gols_m_prev == gols_m_real and gols_v_prev == gols_v_real:
         pontos = 25
-    # Regra 2: Vencedor e Gols do Vencedor
     elif vencedor_prev == vencedor_real and gols_vencedor_prev == gols_vencedor_real and vencedor_real != "E":
         pontos = 18
-    # Regra 3: Vencedor e Diferença de Gols
     elif vencedor_prev == vencedor_real and saldo_prev == saldo_real:
         pontos = 15
-    # Regra 4: Gols do Perdedor (Acertou mesmo errando o resto)
     elif gols_perdedor_prev == gols_perdedor_real and vencedor_real != "E":
         pontos = 12
-    # Regra 5: Somente o Vencedor Seco
     elif vencedor_prev == vencedor_real:
         pontos = 10
     else:
@@ -155,7 +149,6 @@ def realizar_analise_completa(m_time, v_time, banco_dados, media_gols_base, eh_c
     if not eh_copa:
         lambda_m = (t_m["ataque"] * FATOR_CASA_ATAQUE) * (t_v["defesa"] / media_gols_base) * t_m["forma"]
         lambda_v = (t_v["ataque"] * (t_m["defesa"] * FATOR_CASA_DEFESA) / media_gols_base) * t_v["forma"]
-        base_ataque_m, base_ataque_v = t_m["ataque"], t_v["ataque"]
     else:
         ataque_m = ((t_m["hist_ataque"] * 0.3) + (t_m["elim_ataque"] * 0.7)) * contexto_m * forma_m
         defesa_m = ((t_m["hist_defesa"] * 0.3) + (t_m["elim_defesa"] * 0.7)) / forma_m
@@ -165,7 +158,6 @@ def realizar_analise_completa(m_time, v_time, banco_dados, media_gols_base, eh_c
         
         lambda_m = ataque_m * (defesa_v / media_gols_base)
         lambda_v = ataque_v * (defesa_m / media_gols_base)
-        base_ataque_m, base_ataque_v = ataque_m, ataque_v
 
     max_gols = 6
     matriz_gols = pd.DataFrame(0.0, index=range(max_gols), columns=range(max_gols))
@@ -211,7 +203,9 @@ with tab_br:
     with col1: time_m = st.selectbox("Mandante (Casa)", sorted(list(DADOS_BRASILEIRAO.keys())), index=0)
     with col2: time_v = st.selectbox("Visitante (Fora)", sorted(list(DADOS_BRASILEIRAO.keys())), index=1)
     
-    if time_m != time_v:
+    if time_m == time_v:
+        st.warning("⚠️ Selecione dois times diferentes para rodar a simulação do Brasileirão.")
+    else:
         res = realizar_analise_completa(time_m, time_v, DADOS_BRASILEIRAO, MEDIA_GOLS_SÉRIE_A)
         c_mod, c_xg1, c_xg2 = st.columns(3)
         c_mod.metric("Placar Mais Provável", res["placar_moda_str"], f"{round(res['prob_placar']*100, 1)}% de chance")
@@ -238,7 +232,9 @@ with tab_copa:
     with col_c1: selec_m = st.selectbox("Seleção A", lista_completa_copa, index=lista_completa_copa.index("Brasil"))
     with col_c2: selec_v = st.selectbox("Seleção B", lista_completa_copa, index=lista_completa_copa.index("Marrocos"))
 
-    if selec_m != selec_v:
+    if selec_m == selec_v:
+        st.warning("⚠️ Selecione duas seleções diferentes para rodar a análise de Copa.")
+    else:
         res_c = realizar_analise_completa(selec_m, selec_v, DADOS_COPA_PONDERADO, MEDIA_GOLS_FIFA, eh_copa=True,
                                           contexto_m=f_mot_m, contexto_v=f_mot_v, forma_m=forma_m, forma_v=forma_v)
         
@@ -266,23 +262,22 @@ with tab_copa:
 # ==============================================================================
 with tab_auditoria:
     st.header("🏆 Auditoria de Performance Real do Modelo")
-    st.markdown("Insira aqui os placares oficiais dos jogos da Copa assim que eles terminarem. O aplicativo irá confrontá-los com a **sugestão matemática do App** para calcular quantos pontos você acumulou.")
+    st.markdown("Insira aqui os placares oficiais dos jogos da Copa assim que eles terminarem.")
 
     with st.form("inserir_resultado_real"):
         st.subheader("📝 Registrar Placar Encerrado")
         c_aud1, c_aud2 = st.columns(2)
         with c_aud1:
             aud_m = st.selectbox("Seleção A (Casa)", lista_completa_copa, key="aud_m")
-            gols_real_m = st.number_input(f"Gols Reais de {aud_m}", min_value=0, max_value=15, step=1, value=0)
+            gols_real_m = st.number_input(f"Gols Reais de Casa", min_value=0, max_value=15, step=1, value=0, key="gols_m_real_key")
         with c_aud2:
             aud_v = st.selectbox("Seleção B (Fora)", lista_completa_copa, key="aud_v")
-            gols_real_v = st.number_input(f"Gols Reais de {aud_v}", min_value=0, max_value=15, step=1, value=0)
+            gols_real_v = st.number_input(f"Gols Reais de Fora", min_value=0, max_value=15, step=1, value=0, key="gols_v_real_key")
             
         c_check1, c_check2 = st.columns(2)
         with c_check1:
             aud_mata_mata = st.checkbox("Esta partida foi do Mata-Mata? (Dobra a Pontuação)")
         with c_check2:
-            # Inputs manuais das condições do dia em que o palpite foi feito
             aud_status_m = st.selectbox("Contexto usado na A", ["Foco Total / Decisivo", "Rodada 3 - Poupando / Classificado", "Amistoso / Testes"], key="aud_st_m")
             aud_status_v = st.selectbox("Contexto usado na B", ["Foco Total / Decisivo", "Rodada 3 - Poupando / Classificado", "Amistoso / Testes"], key="aud_st_v")
             aud_forma_m = st.slider("Forma usada na A", 0.6, 1.4, 1.0, 0.05, key="aud_f_m")
@@ -294,7 +289,6 @@ with tab_auditoria:
             if aud_m == aud_v:
                 st.error("Erro: Selecione equipes diferentes para computar o jogo.")
             else:
-                # Recupera o palpite exato que o app gerou sob aquelas condições
                 f_ctx_m = 0.75 if aud_status_m == "Rodada 3 - Poupando / Classificado" else (0.90 if aud_status_m == "Amistoso / Testes" else 1.0)
                 f_ctx_v = 0.75 if aud_status_v == "Rodada 3 - Poupando / Classificado" else (0.90 if aud_status_v == "Amistoso / Testes" else 1.0)
                 
@@ -304,10 +298,8 @@ with tab_auditoria:
                 g_m_sugerido = analise_retroativa["placar_moda_m"]
                 g_v_sugerido = analise_retroativa["placar_moda_v"]
                 
-                # Executa o algoritmo de regras do seu Bolão
                 pontos_obtidos = computar_pontos_bolao(g_m_sugerido, g_v_sugerido, gols_real_m, gols_real_v, eh_mata_mata=aud_mata_mata)
                 
-                # Salva o registro completo na memória
                 st.session_state.historico_bolao.append({
                     "Partida": f"{aud_m} x {aud_v}",
                     "Tipo": "Mata-Mata" if aud_mata_mata else "Fase de Grupos",
@@ -315,7 +307,7 @@ with tab_auditoria:
                     "Resultado Real": f"{gols_real_m} x {gols_real_v}",
                     "Pontos Conquistados": pontos_obtidos
                 })
-                st.success("Resultado adicionado com sucesso!")
+                st.success(f"Resultado computado! O app sugeriu {analise_retroativa['placar_moda_str']} e você fez {pontos_obtidos} pontos.")
 
     # Exibição do Painel Geral de Desempenho
     st.markdown("---")
