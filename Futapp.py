@@ -288,7 +288,7 @@ with tab_auditoria:
                     gols_a_real = int(linha['Gols_A'])
                     gols_b_real = int(linha['Gols_B'])
                     
-                    eh_mata = int(linha['Mata_Mata']) == 1 if 'Mata_Mata' in collapse else False
+                    eh_mata = int(linha['Mata_Mata']) == 1 if 'Mata_Mata' in linha else False
 
                     if time_a in DADOS_COPA_PONDERADO and time_b in DADOS_COPA_PONDERADO:
                         analise_retroativa = realizar_analise_completa(time_a, time_b, DADOS_COPA_PONDERADO, MEDIA_GOLS_FIFA, eh_copa=True)
