@@ -13,11 +13,10 @@ st.set_page_config(
 )
 
 # ==============================================================================
-# CONFIGURAÇÃO DO GOOGLE SHEETS (VIA EXCEL PARSE)
+# CONFIGURAÇÃO DO GOOGLE SHEETS (VIA PLANILHA PUBLICADA NA WEB)
 # ==============================================================================
-# ID e URL corrigidos para evitar falhas de autenticação 404
-ID_DA_PLANILHA = "1qudxtcLg7y_iw0dxXCN318IWX1LdnEb2X4SaBNvuV4I"
-URL_PLANILHA = f"https://docs.google.com/spreadsheets/d/{ID_DA_PLANILHA}/export?format=xlsx"
+# Link exato gerado pela publicação na web, convertido para saída XLSX estável
+URL_PLANILHA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ2UImQ-2bmA60sWyPw6vJxj7MKkQwotoOYpVthV-SZzOK2DyJetVlQptCwmbv6gzRRs3YbDVekxaXXa/pub?output=xlsx"
 
 # Constantes de Calibração Estatística Globais
 MEDIA_GOLS_SÉRIE_A = 1.28
