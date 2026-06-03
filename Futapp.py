@@ -15,7 +15,8 @@ st.set_page_config(
 # ==============================================================================
 # CONFIGURAÇÃO DO GOOGLE SHEETS (VIA EXCEL PARSE)
 # ==============================================================================
-ID_DA_PLANILHA = "1qudxtcLg7y_iw0dxxCN318IWX1LdnEb2X4SaBNvuV4I"
+# ID e URL corrigidos para evitar falhas de autenticação 404
+ID_DA_PLANILHA = "1qudxtcLg7y_iw0dxXCN318IWX1LdnEb2X4SaBNvuV4I"
 URL_PLANILHA = f"https://docs.google.com/spreadsheets/d/{ID_DA_PLANILHA}/export?format=xlsx"
 
 # Constantes de Calibração Estatística Globais
@@ -94,7 +95,7 @@ DADOS_COPA_PONDERADO = {
     "Portugal": {"grupo": "K", "hist_ataque": 2.4, "hist_defesa": 0.8, "elim_ataque": 2.5, "elim_defesa": 0.7, "escanteios": 6.3, "cartoes": 1.9, "faltas": 11.4},
     "RD do Congo": {"grupo": "K", "hist_ataque": 1.3, "hist_defesa": 1.3, "elim_ataque": 1.4, "elim_defesa": 1.1, "escanteios": 4.5, "cartoes": 2.4, "faltas": 15.5},
     "Uzbequistão": {"grupo": "K", "hist_ataque": 1.2, "hist_defesa": 1.2, "elim_ataque": 1.4, "elim_defesa": 1.0, "escanteios": 4.4, "cartoes": 1.8, "faltas": 13.2},
-    "Colômbia": {"grupo": "K", "hist_ataque": 1.8, "high_defesa": 0.9, "elim_ataque": 2.0, "elim_defesa": 0.8, "escanteios": 5.4, "cartoes": 2.7, "faltas": 14.9},
+    "Colômbia": {"grupo": "K", "hist_ataque": 1.8, "hist_defesa": 0.9, "elim_ataque": 2.0, "elim_defesa": 0.8, "escanteios": 5.4, "cartoes": 2.7, "faltas": 14.9},
     "Inglaterra": {"grupo": "L", "hist_ataque": 2.3, "hist_defesa": 0.8, "elim_ataque": 2.4, "elim_defesa": 0.7, "escanteios": 6.6, "cartoes": 1.4, "faltas": 11.2},
     "Croácia": {"grupo": "L", "hist_ataque": 1.6, "hist_defesa": 1.0, "elim_ataque": 1.5, "elim_defesa": 0.9, "escanteios": 5.2, "cartoes": 1.8, "faltas": 12.1},
     "Gana": {"grupo": "L", "hist_ataque": 1.4, "hist_defesa": 1.4, "elim_ataque": 1.5, "elim_defesa": 1.2, "escanteios": 4.7, "cartoes": 2.3, "faltas": 14.8},
@@ -244,7 +245,7 @@ with tab_copa:
             st.markdown(f"**Ambas Marcam - NÃO:** {round(res_c['btts_nao']*100, 1)}%")
 
 # ==============================================================================
-# AUDITORIA TOTALMENTE PROCESSADA EM SEGUNDO PLANO (SEM INPUTS DUPLICADOS)
+# AUDITORIA TOTALMENTE PROCESSADA EM SEGUNDO PLANO
 # ==============================================================================
 with tab_auditoria:
     st.header("🏆 Auditoria de Performance em Tempo Real")
