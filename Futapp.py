@@ -12,9 +12,12 @@ st.set_page_config(
     layout="wide",
 )
 
-# Inicialização do Banco de Dados de Auditoria na Memória do App
-if "historico_bolao" not in st.session_state:
-    st.session_state.historico_bolao = []
+# ==============================================================================
+# CONFIGURAÇÃO DO GOOGLE SHEETS (AUTOMATIZAÇÃO DOS 104 JOGOS)
+# ==============================================================================
+# ⚠️ ADICIONE O ID DA SUA PLANILHA AQUI:
+ID_DA_PLANILHA = "1qudxtcLg7y_iw0dxxCN3l8IWX1LdnEb2X4SaBNvuV4I" 
+URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1qudxtcLg7y_iw0dxxCN3l8IWX1LdnEb2X4SaBNvuV4I/edit?usp=sharing"
 
 # Constantes de Calibração Estatística Globais
 MEDIA_GOLS_SÉRIE_A = 1.28
@@ -23,7 +26,7 @@ FATOR_CASA_ATAQUE = 1.15
 FATOR_CASA_DEFESA = 0.85  
 
 # ==============================================================================
-# BANCOS DE DADOS (BRASILEIRÃO & COPA)
+# BANCOS DE DADOS
 # ==============================================================================
 DADOS_BRASILEIRAO = {
     "Athletico-PR": {"ataque": 1.5, "defesa": 1.1, "forma": 0.98, "escanteios": 5.5, "cartoes": 2.5, "faltas": 14.2},
@@ -141,8 +144,7 @@ def computar_pontos_bolao(gols_m_prev, gols_v_prev, gols_m_real, gols_v_real, eh
         
     return pontos
 
-def realizar_analise_completa(m_time, v_time, banco_dados, media_gols_base, eh_copa=False, 
-                              contexto_m=1.0, contexto_v=1.0, forma_m=1.0, forma_v=1.0):
+def realizar_analise_completa(m_time, v_time, banco_dados, media_gols_base, eh_copa=False):
     t_m = banco_dados[m_time]
     t_v = banco_dados[v_time]
 
@@ -150,11 +152,11 @@ def realizar_analise_completa(m_time, v_time, banco_dados, media_gols_base, eh_c
         lambda_m = (t_m["ataque"] * FATOR_CASA_ATAQUE) * (t_v["defesa"] / media_gols_base) * t_m["forma"]
         lambda_v = (t_v["ataque"] * (t_m["defesa"] * FATOR_CASA_DEFESA) / media_gols_base) * t_v["forma"]
     else:
-        ataque_m = ((t_m["hist_ataque"] * 0.3) + (t_m["elim_ataque"] * 0.7)) * contexto_m * forma_m
-        defesa_m = ((t_m["hist_defesa"] * 0.3) + (t_m["elim_defesa"] * 0.7)) / forma_m
+        ataque_m = ((t_m["hist_ataque"] * 0.3) + (t_m["elim_ataque"] * 0.7))
+        defesa_m = ((t_m["hist_defesa"] * 0.3) + (t_m["elim_defesa"] * 0.7))
         
-        ataque_v = ((t_v["hist_ataque"] * 0.3) + (t_v["elim_ataque"] * 0.7)) * contexto_v * forma_v
-        defesa_v = ((t_v["hist_defesa"] * 0.3) + (t_v["elim_defesa"] * 0.7)) / forma_v
+        ataque_v = ((t_v["hist_ataque"] * 0.3) + (t_v["elim_ataque"] * 0.7))
+        defesa_v = ((t_v["hist_defesa"] * 0.3) + (t_v["elim_defesa"] * 0.7))
         
         lambda_m = ataque_m * (defesa_v / media_gols_base)
         lambda_v = ataque_v * (defesa_m / media_gols_base)
@@ -213,20 +215,6 @@ with tab_br:
         c_xg2.metric(f"xG - {time_v}", res["gols_esperados_v"])
 
 with tab_copa:
-    st.sidebar.header("⚙️ Central de Contexto Operacional")
-    status_m = st.sidebar.selectbox("Contexto Seleção A", ["Foco Total / Decisivo", "Rodada 3 - Poupando / Classificado", "Amistoso / Testes"], index=0)
-    status_v = st.sidebar.selectbox("Contexto Seleção B", ["Foco Total / Decisivo", "Rodada 3 - Poupando / Classificado", "Amistoso / Testes"], index=0)
-    
-    f_mot_m = 0.75 if status_m == "Rodada 3 - Poupando / Classificado" else (0.90 if status_m == "Amistoso / Testes" else 1.0)
-    f_mot_v = 0.75 if status_v == "Rodada 3 - Poupando / Classificado" else (0.90 if status_v == "Amistoso / Testes" else 1.0)
-
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("🔥 Desempenho Recente em Campo")
-    forma_m = st.sidebar.slider("Forma na Copa: Seleção A", 0.6, 1.4, 1.0, 0.05)
-    forma_v = st.sidebar.slider("Forma na Copa: Seleção B", 0.6, 1.4, 1.0, 0.05)
-    
-    fase_mata_mata = st.sidebar.checkbox("Jogo do Mata-Mata? (Pontos Dobrados)")
-
     lista_completa_copa = sorted(list(DADOS_COPA_PONDERADO.keys()))
     col_c1, col_c2 = st.columns(2)
     with col_c1: selec_m = st.selectbox("Seleção A", lista_completa_copa, index=lista_completa_copa.index("Brasil"))
@@ -235,8 +223,7 @@ with tab_copa:
     if selec_m == selec_v:
         st.warning("⚠️ Selecione duas seleções diferentes para rodar a análise de Copa.")
     else:
-        res_c = realizar_analise_completa(selec_m, selec_v, DADOS_COPA_PONDERADO, MEDIA_GOLS_FIFA, eh_copa=True,
-                                          contexto_m=f_mot_m, contexto_v=f_mot_v, forma_m=forma_m, forma_v=forma_v)
+        res_c = realizar_analise_completa(selec_m, selec_v, DADOS_COPA_PONDERADO, MEDIA_GOLS_FIFA, eh_copa=True)
         
         cm_mod, cm_xg1, cm_xg2 = st.columns(3)
         cm_mod.metric("Placar Sugerido pelo Modelo", res_c["placar_moda_str"], f"{round(res_c['prob_placar']*100, 1)}% de confiança")
@@ -252,80 +239,74 @@ with tab_copa:
             st.markdown(f"**Ambas Marcam - SIM:** {round(res_c['btts_sim']*100, 1)}%")
             st.markdown(f"**Ambas Marcam - NÃO:** {round(res_c['btts_nao']*100, 1)}%")
 
-        with st.expander("🗺️ Ver Matriz Colorida de Probabilidades"):
-            fig_c, ax_c = plt.subplots(figsize=(4.5, 2.2))
-            sns.heatmap(res_c["matriz"], annot=True, fmt=".1%", cmap="Oranges", xticklabels=range(6), yticklabels=range(6), ax=ax_c, annot_kws={"size": 6})
-            st.pyplot(fig_c)
-
 # ==============================================================================
-# NOVA ABA: HISTÓRICO & AUDITORIA DE PERFORMANCE
+# NOVA ABA: HISTÓRICO INTEGRADO AUTOMÁTICO COM GOOGLE SHEETS
 # ==============================================================================
 with tab_auditoria:
-    st.header("🏆 Auditoria de Performance Real do Modelo")
-    st.markdown("Insira aqui os placares oficiais dos jogos da Copa assim que eles terminarem.")
+    st.header("🏆 Auditoria de Performance em Tempo Real (Google Sheets)")
+    st.markdown("Esta aba se conecta diretamente ao seu Google Sheets. Ela puxa os resultados oficiais salvos na planilha, cruza com a sugestão do algoritmo e calcula o seu placar geral automaticamente.")
 
-    with st.form("inserir_resultado_real"):
-        st.subheader("📝 Registrar Placar Encerrado")
-        c_aud1, c_aud2 = st.columns(2)
-        with c_aud1:
-            aud_m = st.selectbox("Seleção A (Casa)", lista_completa_copa, key="aud_m")
-            gols_real_m = st.number_input(f"Gols Reais de Casa", min_value=0, max_value=15, step=1, value=0, key="gols_m_real_key")
-        with c_aud2:
-            aud_v = st.selectbox("Seleção B (Fora)", lista_completa_copa, key="aud_v")
-            gols_real_v = st.number_input(f"Gols Reais de Fora", min_value=0, max_value=15, step=1, value=0, key="gols_v_real_key")
-            
-        c_check1, c_check2 = st.columns(2)
-        with c_check1:
-            aud_mata_mata = st.checkbox("Esta partida foi do Mata-Mata? (Dobra a Pontuação)")
-        with c_check2:
-            aud_status_m = st.selectbox("Contexto usado na A", ["Foco Total / Decisivo", "Rodada 3 - Poupando / Classificado", "Amistoso / Testes"], key="aud_st_m")
-            aud_status_v = st.selectbox("Contexto usado na B", ["Foco Total / Decisivo", "Rodada 3 - Poupando / Classificado", "Amistoso / Testes"], key="aud_st_v")
-            aud_forma_m = st.slider("Forma usada na A", 0.6, 1.4, 1.0, 0.05, key="aud_f_m")
-            aud_forma_v = st.slider("Forma usada na B", 0.6, 1.4, 1.0, 0.05, key="aud_f_v")
-
-        enviar_dados = st.form_submit_button("💥 Computar Resultado e Atualizar Tabela")
-
-        if enviar_dados:
-            if aud_m == aud_v:
-                st.error("Erro: Selecione equipes diferentes para computar o jogo.")
-            else:
-                f_ctx_m = 0.75 if aud_status_m == "Rodada 3 - Poupando / Classificado" else (0.90 if aud_status_m == "Amistoso / Testes" else 1.0)
-                f_ctx_v = 0.75 if aud_status_v == "Rodada 3 - Poupando / Classificado" else (0.90 if aud_status_v == "Amistoso / Testes" else 1.0)
-                
-                analise_retroativa = realizar_analise_completa(aud_m, aud_v, DADOS_COPA_PONDERADO, MEDIA_GOLS_FIFA, eh_copa=True,
-                                                              contexto_m=f_ctx_m, contexto_v=f_ctx_v, forma_m=aud_forma_m, forma_v=aud_forma_v)
-                
-                g_m_sugerido = analise_retroativa["placar_moda_m"]
-                g_v_sugerido = analise_retroativa["placar_moda_v"]
-                
-                pontos_obtidos = computar_pontos_bolao(g_m_sugerido, g_v_sugerido, gols_real_m, gols_real_v, eh_mata_mata=aud_mata_mata)
-                
-                st.session_state.historico_bolao.append({
-                    "Partida": f"{aud_m} x {aud_v}",
-                    "Tipo": "Mata-Mata" if aud_mata_mata else "Fase de Grupos",
-                    "Sugestão do App": analise_retroativa["placar_moda_str"],
-                    "Resultado Real": f"{gols_real_m} x {gols_real_v}",
-                    "Pontos Conquistados": pontos_obtidos
-                })
-                st.success(f"Resultado computado! O app sugeriu {analise_retroativa['placar_moda_str']} e você fez {pontos_obtidos} pontos.")
-
-    # Exibição do Painel Geral de Desempenho
-    st.markdown("---")
-    st.subheader("🏆 Balanço Geral Acumulado")
-    
-    if len(st.session_state.historico_bolao) > 0:
-        df_historico = pd.DataFrame(st.session_state.historico_bolao)
-        total_pontos = df_historico["Pontos Conquistados"].sum()
-        
-        col_p1, col_p2 = st.columns(2)
-        col_p1.metric("Total de Pontos Conquistados com o App", f"{total_pontos} pts")
-        col_p2.metric("Jogos Analisados", f"{len(df_historico)} partidas")
-        
-        st.markdown("#### Detalhamento Rodada a Rodada")
-        st.dataframe(df_historico, use_container_width=True)
-        
-        if st.button("🧹 Resetar Histórico (Limpar Dados)"):
-            st.session_state.historico_bolao = []
-            st.rerun()
+    if ID_DA_PLANILHA == "SEU_ID_LONGO_DA_PLANILHA_AQUI":
+        st.info("💡 Para ativar o rastreamento automático de pontos, configure o `ID_DA_PLANILHA` no código do app com o ID da sua planilha pública do Google Sheets.")
     else:
-        st.info("Nenhum jogo registrado ainda. Insira os resultados acima conforme as partidas forem acontecendo na Copa real!")
+        try:
+            # Baixa os dados em tempo real da planilha
+            df_sheets = pd.read_csv(URL_PLANILHA)
+            
+            # Remove espaços extras dos nomes de colunas
+            df_sheets.columns = df_sheets.columns.str.strip()
+            
+            # Filtra apenas os jogos que já possuem resultados válidos preenchidos (ignorando nulos ou -1)
+            df_encerrados = df_sheets.dropna(subset=['Gols_A', 'Gols_B'])
+            df_encerrados = df_encerrados[(df_encerrados['Gols_A'] >= 0) & (df_encerrados['Gols_B'] >= 0)]
+
+            if len(df_encerrados) > 0:
+                historico_calculado = []
+                
+                for _, linha in df_encerrados.iterrows():
+                    time_a = str(linha['Selecao_A']).strip()
+                    time_b = str(linha['Selecao_B']).strip()
+                    gols_a_real = int(linha['Gols_A'])
+                    gols_b_real = int(linha['Gols_B'])
+                    
+                    # Verifica se o jogo é do mata-mata (se houver essa coluna na planilha, ou assume Falso)
+                    eh_mata = int(linha['Mata_Mata']) == 1 if 'Mata_Mata' in linha else False
+
+                    # Garante que os dois times existem no banco de dados estatísticos do App
+                    if time_a in DADOS_COPA_PONDERADO and time_b in DADOS_COPA_PONDERADO:
+                        # Roda a inteligência do app retroativamente para descobrir qual tinha sido o palpite
+                        analise_retroativa = realizar_analise_completa(time_a, time_b, DADOS_COPA_PONDERADO, MEDIA_GOLS_FIFA, eh_copa=True)
+                        
+                        g_a_sugerido = analise_retroativa["placar_moda_m"]
+                        g_b_sugerido = analise_retroativa["placar_moda_v"]
+                        
+                        # Calcula a pontuação com base nas regras do bolão
+                        pontos = computar_pontos_bolao(g_a_sugerido, g_b_sugerido, gols_a_real, gols_b_real, eh_mata_mata=eh_mata)
+                        
+                        historico_calculado.append({
+                            "Partida": f"{time_a} x {time_b}",
+                            "Tipo": "Mata-Mata" if eh_mata else "Fase de Grupos",
+                            "Sugestão do App": analise_retroativa["placar_moda_str"],
+                            "Placar Real Oficial": f"{gols_a_real} x {gols_b_real}",
+                            "Pontos Obtidos": pontos
+                        })
+
+                if len(historico_calculado) > 0:
+                    df_final = pd.DataFrame(historico_calculado)
+                    total_pontos = df_final["Pontos Obtidos"].sum()
+                    
+                    # Métricas de destaque
+                    c_m1, c_m2 = st.columns(2)
+                    c_m1.metric("🎯 Total Acumulado pelo App", f"{total_pontos} pts")
+                    c_m2.metric("🏁 Jogos Processados", f"{len(df_final)} de 104")
+                    
+                    st.markdown("#### 📋 Histórico Consolidado de Resultados")
+                    st.dataframe(df_final, use_container_width=True)
+                else:
+                    st.warning("⚠️ Os times listados na planilha não coincidem com os nomes das seleções cadastradas no App.")
+            else:
+                st.info("📅 Nenhum jogo foi encerrado ainda na planilha. Adicione os gols dos jogos finalizados lá para ver os pontos subirem aqui!")
+                
+        except Exception as e:
+            st.error(f"Erro ao ler os dados do Google Sheets: {e}")
+            st.info("Certifique-se de que a planilha está configurada como 'Qualquer pessoa com o link pode ler' e que os nomes das colunas estão corretos.")
