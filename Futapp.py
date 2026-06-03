@@ -13,10 +13,10 @@ st.set_page_config(
 )
 
 # ==============================================================================
-# CONFIGURAÇÃO DO GOOGLE SHEETS (VIA PLANILHA PUBLICADA NA WEB)
+# CONFIGURAÇÃO DO GOOGLE SHEETS (API DE DADOS CSV - ANTI-404)
 # ==============================================================================
-# Link exato gerado pela publicação na web, convertido para saída XLSX estável
-URL_PLANILHA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ2UImQ-2bmA60sWyPw6vJxj7MKkQwotoOYpVthV-SZzOK2DyJetVlQptCwmbv6gzRRs3YbDVekxaXXa/pub?output=xlsx"
+# Puxa diretamente os dados da tabela via API gviz, evitando bloqueios de permissão 404
+URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1qudxtcLg7y_iw0dxXCN318IWX1LdnEb2X4SaBNvuV4I/gviz/tq?tqx=out:csv"
 
 # Constantes de Calibração Estatística Globais
 MEDIA_GOLS_SÉRIE_A = 1.28
@@ -244,14 +244,15 @@ with tab_copa:
             st.markdown(f"**Ambas Marcam - NÃO:** {round(res_c['btts_nao']*100, 1)}%")
 
 # ==============================================================================
-# AUDITORIA TOTALMENTE PROCESSADA EM SEGUNDO PLANO
+# AUDITORIA TOTALMENTE CONVERTIDA PARA LEITURA DE API CSV NATIVA
 # ==============================================================================
 with tab_auditoria:
     st.header("🏆 Auditoria de Performance em Tempo Real")
     st.markdown("Esta aba calcula automaticamente a pontuação que o algoritmo obteria com base nos resultados preenchidos na sua planilha.")
 
     try:
-        df_sheets = pd.read_excel(URL_PLANILHA)
+        # Trocado de read_excel para read_csv usando o endpoint estruturado anti-404
+        df_sheets = pd.read_csv(URL_PLANILHA)
         df_sheets.columns = df_sheets.columns.str.strip()
         
         colunas_obrigatorias = ['Selecao_A', 'Selecao_B', 'Gols_A', 'Gols_B', 'Mata_Mata']
